@@ -15,6 +15,7 @@
 
 #include "include/pika_binlog.h"
 
+class PikaCache;
 class Cmd;
 
 /*
@@ -55,6 +56,7 @@ class Slot : public std::enable_shared_from_this<Slot>,public pstd::noncopyable 
   uint32_t GetSlotID() const;
   std::string GetSlotName() const;
   std::shared_ptr<storage::Storage> db() const;
+  std::shared_ptr<PikaCache> cache() const;
 
   void Compact(const storage::DataType& type);
 
@@ -129,6 +131,7 @@ class Slot : public std::enable_shared_from_this<Slot>,public pstd::noncopyable 
 
   // key scan info use
   void InitKeyScan();
+  std::shared_ptr<PikaCache> cache_;
 
 };
 

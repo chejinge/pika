@@ -10,8 +10,10 @@
 #include "include/pika_binlog_transverter.h"
 #include "include/pika_conf.h"
 #include "include/pika_slot_command.h"
+#include "include/pika_cache_manager.h"
 
 extern std::unique_ptr<PikaConf> g_pika_conf;
+extern std::shared_ptr<PikaCacheManager> g_pika_cache_manager;
 
 /* SET key value [NX] [XX] [EX <seconds>] [PX <milliseconds>] */
 void SetCmd::DoInitial() {
@@ -99,6 +101,26 @@ void SetCmd::Do(std::shared_ptr<Slot> slot) {
   }
 }
 
+void SetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  switch (condition_) {
+    case SetCmd::kXX:
+      slot->cache()->Setxx(key_, value_, sec_);
+      break;
+    case SetCmd::kNX:
+      slot->cache()->Setnx(key_, value_, sec_);
+      break;
+    /*case SetCmd::kVX:
+      slot->cache()->Setvx(key_, target_, value_, sec_);
+      break;
+    case SetCmd::kEXORPX:
+      slot->cache()->Setex(key_, value_, static_cast<int32_t>(sec_));
+      break;*/
+    default:
+      slot->cache()->SetWithoutTTL(key_, value_);
+      break;
+  }
+}
+
 std::string SetCmd::ToBinlog(uint32_t exec_time, uint32_t term_id, uint64_t logic_id, uint32_t filenum,
                              uint64_t offset) {
   if (condition_ == SetCmd::kEXORPX) {
@@ -140,15 +162,29 @@ void GetCmd::DoInitial() {
 
 void GetCmd::Do(std::shared_ptr<Slot> slot) {
   std::string value;
-  rocksdb::Status s = slot->db()->Get(key_, &value);
+  auto s = slot->db()->GetWithTTL(key_, &value_, &sec_);
   if (s.ok()) {
-    res_.AppendStringLenUint64(value.size());
-    res_.AppendContent(value);
+    res_.AppendStringLenUint64(value_.size());
+    res_.AppendContent(value_);
   } else if (s.IsNotFound()) {
     res_.AppendStringLen(-1);
   } else {
     res_.SetRes(CmdRes::kErrOther, s.ToString());
   }
+}
+
+void GetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  auto s = slot->cache()->Get(key_, &value_);
+  if (s.ok()) {
+    res_.AppendStringLenUint64(value_.size());
+    res_.AppendContent(value_);
+    return;
+  }
+  res_.AppendInteger(-1);
+}
+
+void GetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  slot->cache()->Set(key_, value_, sec_);
 }
 
 void DelCmd::DoInitial() {
@@ -172,6 +208,9 @@ void DelCmd::Do(std::shared_ptr<Slot> slot) {
   } else {
     res_.SetRes(CmdRes::kErrOther, "delete error");
   }
+  if (count >= 0 && is_need_update_cache()) {
+    slot->cache()->Del(keys_[0]);
+  }
 }
 
 void DelCmd::Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) {
@@ -181,6 +220,9 @@ void DelCmd::Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) {
     split_res_ += count;
   } else {
     res_.SetRes(CmdRes::kErrOther, "delete error");
+  }
+  for (int i = 0; i < hint_keys.keys.size(); i++){
+  //slot->cache()->Del(hint_keys.keys[i]);
   }
 }
 
@@ -218,6 +260,11 @@ void IncrCmd::Do(std::shared_ptr<Slot> slot) {
   }
 }
 
+void IncrCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  slot->cache()->IncrByxx(key_, 1);
+}
+
+
 void IncrbyCmd::DoInitial() {
   if (!CheckArg(argv_.size())) {
     res_.SetRes(CmdRes::kWrongNum, kCmdNameIncrby);
@@ -241,6 +288,9 @@ void IncrbyCmd::Do(std::shared_ptr<Slot> slot) {
     res_.SetRes(CmdRes::kOverFlow);
   } else {
     res_.SetRes(CmdRes::kErrOther, s.ToString());
+  }
+  if (res_.ok() && is_need_update_cache()) {
+    slot->cache()->IncrByxx(key_, by_);
   }
 }
 
@@ -269,6 +319,9 @@ void IncrbyfloatCmd::Do(std::shared_ptr<Slot> slot) {
     res_.SetRes(CmdRes::KIncrByOverFlow);
   } else {
     res_.SetRes(CmdRes::kErrOther, s.ToString());
+  }
+  if (res_.ok() && is_need_update_cache()) {
+    slot->cache()->DecrByxx(key_, by_);
   }
 }
 
@@ -341,6 +394,9 @@ void GetsetCmd::Do(std::shared_ptr<Slot> slot) {
   } else {
     res_.SetRes(CmdRes::kErrOther, s.ToString());
   }
+  if (res_.ok() && is_need_update_cache()) {
+    slot->cache()->SetWithoutTTL(key_, new_value_);
+  }
 }
 
 void AppendCmd::DoInitial() {
@@ -361,6 +417,9 @@ void AppendCmd::Do(std::shared_ptr<Slot> slot) {
   } else {
     res_.SetRes(CmdRes::kErrOther, s.ToString());
   }
+  if (res_.ok() && is_need_update_cache()) {
+    slot->cache()->Appendxx(key_, value_);
+  }
 }
 
 void MgetCmd::DoInitial() {
@@ -375,8 +434,8 @@ void MgetCmd::DoInitial() {
 
 void MgetCmd::Do(std::shared_ptr<Slot> slot) {
   std::vector<storage::ValueStatus> vss;
-  rocksdb::Status s = slot->db()->MGet(keys_, &vss);
-  if (s.ok()) {
+  auto status = slot->db()->MGet(keys_, &vss);
+  if (status.ok()) {
     res_.AppendArrayLenUint64(vss.size());
     for (const auto& vs : vss) {
       if (vs.status.ok()) {
@@ -387,8 +446,30 @@ void MgetCmd::Do(std::shared_ptr<Slot> slot) {
       }
     }
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, status.ToString());
   }
+}
+
+void MgetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  std::vector<storage::ValueStatus> vss;
+  auto status = slot->cache()->MGet(keys_, &vss);
+  if (!status.ok()) {
+    res_.SetRes(CmdRes::kNotFound);
+    return;
+  }
+  res_.AppendArrayLenUint64(vss.size());
+  for (const auto& vs : vss) {
+    if (vs.status.ok()) {
+      res_.AppendStringLenUint64(vs.value.size());
+      res_.AppendContent(vs.value);
+    } else {
+      res_.AppendContent("$-1");
+    }
+  }
+}
+
+void MgetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+
 }
 
 void MgetCmd::Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) {
@@ -405,6 +486,11 @@ void MgetCmd::Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) {
     }
   } else {
     res_.SetRes(CmdRes::kErrOther, s.ToString());
+  }
+  if (res_.ok() && is_need_update_cache()) {
+    for(int i = 0; i < keys_.size(); i++){
+    //slot->cache()->SetnxWithoutTTL(keys_, &vss);
+    }
   }
 }
 
@@ -533,6 +619,9 @@ void SetexCmd::Do(std::shared_ptr<Slot> slot) {
   } else {
     res_.SetRes(CmdRes::kErrOther, s.ToString());
   }
+  if (res_.ok() && is_need_update_cache()) {
+    slot->cache()->Set(key_, value_, sec_);
+  }
 }
 
 std::string SetexCmd::ToBinlog(uint32_t exec_time, uint32_t term_id, uint64_t logic_id, uint32_t filenum,
@@ -581,6 +670,9 @@ void PsetexCmd::Do(std::shared_ptr<Slot> slot) {
     res_.SetRes(CmdRes::kOk);
   } else {
     res_.SetRes(CmdRes::kErrOther, s.ToString());
+  }
+  if (res_.ok() && is_need_update_cache()) {
+    slot->cache()->Set(key_, value_, usec_ / 1000);
   }
 }
 

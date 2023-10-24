@@ -140,6 +140,10 @@ Status Storage::Setxx(const Slice& key, const Slice& value, int32_t* ret, const 
 
 Status Storage::Get(const Slice& key, std::string* value) { return strings_db_->Get(key, value); }
 
+Status Storage::GetWithTTL(const Slice& key, std::string* value, int64_t* ttl) {
+  return strings_db_->GetWithTTL(key, value, ttl);
+}
+
 Status Storage::GetSet(const Slice& key, const Slice& value, std::string* old_value) {
   return strings_db_->GetSet(key, value, old_value);
 }

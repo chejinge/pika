@@ -211,7 +211,8 @@ class InfoCmd : public Cmd {
     kInfo,
     kInfoAll,
     kInfoDebug,
-    kInfoCommandStats
+    kInfoCommandStats,
+    kInfoCache
   };
 
   InfoCmd(const std::string& name, int arity, uint16_t flag) : Cmd(name, arity, flag) {}
@@ -239,7 +240,7 @@ class InfoCmd : public Cmd {
   const static std::string kRocksDBSection;
   const static std::string kDebugSection;
   const static std::string kCommandStatsSection;
-
+  const static std::string KPcache;
   void DoInitial() override;
   void Clear() override {
     rescan_ = false;
@@ -259,6 +260,8 @@ class InfoCmd : public Cmd {
   void InfoRocksDB(std::string& info);
   void InfoDebug(std::string& info);
   void InfoCommandStats(std::string& info);
+  void InfoCache(std::string& info);
+  std::string CacheStatusToString(int status);
 };
 
 class ShutdownCmd : public Cmd {

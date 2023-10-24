@@ -159,6 +159,10 @@ class Storage {
   // the special value nil is returned
   Status Get(const Slice& key, std::string* value);
 
+  // Get the value and ttl of key. If the key does not exist
+  // the special value nil is returned. If the key has no ttl, ttl is -1
+  Status GetWithTTL(const Slice& key, std::string* value, int64_t* ttl);
+
   // Atomically sets key to value and returns the old value stored at key
   // Returns an error when key exists but does not hold a string value.
   Status GetSet(const Slice& key, const Slice& value, std::string* old_value);

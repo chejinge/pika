@@ -14,8 +14,14 @@ class Status {
 
   // Copy the specified status.
   Status(const Status& s);
-  void operator=(const Status& s);
-
+  void operator=(Status s) noexcept {
+    // The following condition catches both aliasing (when this == &s),
+    // and the common case where both s and *this are ok.
+    if (&s != this && state_ != s.state_) {
+      delete[] state_;
+      state_ = !s.state_ ? nullptr : CopyState(s.state_);
+    }
+  }
   // Return a success status.
   static Status OK() { return {}; }
 
@@ -109,14 +115,6 @@ class Status {
 };
 
 inline Status::Status(const Status& s) { state_ = !s.state_ ? nullptr : CopyState(s.state_); }
-inline void Status::operator=(const Status& s) {
-  // The following condition catches both aliasing (when this == &s),
-  // and the common case where both s and *this are ok.
-  if (&s != this && state_ != s.state_) {
-    delete[] state_;
-    state_ = !s.state_ ? nullptr : CopyState(s.state_);
-  }
-}
 
 }  // namespace pstd
 
