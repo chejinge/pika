@@ -25,6 +25,7 @@ class SetCmd : public Cmd {
   }
   void Do(std::shared_ptr<Slot> slot = nullptr) override;
   void DoUpdateCache(std::shared_ptr<Slot> slot = nullptr) override;
+  void DoFromCache(std::shared_ptr<Slot> slot = nullptr) override;
   void Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) override{};
   void Merge() override{};
   Cmd* Clone() override { return new SetCmd(*this); }
@@ -66,12 +67,15 @@ class GetCmd : public Cmd {
   std::string value_;
   int64_t sec_ = 0;
   void DoInitial() override;
+  rocksdb::Status s_;
 };
 
 class DelCmd : public Cmd {
  public:
   DelCmd(const std::string& name, int arity, uint16_t flag) : Cmd(name, arity, flag){};
   void Do(std::shared_ptr<Slot> slot = nullptr) override;
+  void DoFromCache(std::shared_ptr<Slot> slot = nullptr) override;
+  void DoUpdateCache(std::shared_ptr<Slot> slot = nullptr) override;
   std::vector<std::string> current_key() const override { return keys_; }
   void Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) override;
   void Merge() override;

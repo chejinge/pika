@@ -52,6 +52,8 @@ elseif(${BUILD_TYPE} STREQUAL RELWITHDEBINFO)
 else()
   set(LIB_BUILD_TYPE RELEASE)
   set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+
+
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
@@ -628,9 +630,9 @@ ExternalProject_Add(rocksdb
 
 ExternalProject_Add(rediscache
   URL
-  https://github.com/pikiwidb/rediscache/archive/refs/tags/v1.0.2.tar.gz
+  https://github.com/pikiwidb/rediscache/archive/refs/tags/v1.0.3.tar.gz
   URL_HASH
-  MD5=0d72a2d4832500773bd47d3efb23bca8
+  MD5=fb8e2bf915748a287c7cf3239bb4fe86
   DOWNLOAD_NO_PROGRESS
   1
   UPDATE_COMMAND
@@ -761,9 +763,7 @@ message("pika GIT_DATE = ${PIKA_GIT_DATE}")
 message("pika GIT_TAG = ${PIKA_GIT_TAG}")
 message("pika BUILD_DATE = ${PIKA_BUILD_DATE}")
 
-set(PIKA_BUILD_VERSION_CC ${CMAKE_BINARY_DIR}/pika_build_version.cc
-        src/pika_cache_load_thread.cc
-        src/pika_cache_manager.cc)
+set(PIKA_BUILD_VERSION_CC ${CMAKE_BINARY_DIR}/pika_build_version.cc)
 message("PIKA_BUILD_VERSION_CC : " ${PIKA_BUILD_VERSION_CC})
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/build_version.cc.in ${PIKA_BUILD_VERSION_CC} @ONLY)
 

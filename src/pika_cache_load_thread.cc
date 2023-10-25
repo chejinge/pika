@@ -155,7 +155,7 @@ bool PikaCacheLoadThread::LoadZset(std::string &key, const std::shared_ptr<Slot>
     return false;
   }
 
-  unsigned long cache_len = 0;
+  uint64_t cache_len = 0;
   cache_->CacheZCard(key, &cache_len);
   if (cache_len != 0) {
     return true;

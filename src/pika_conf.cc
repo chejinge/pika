@@ -13,7 +13,7 @@
 #include "pstd/include/env.h"
 #include "pstd/include/pstd_string.h"
 
-#include "cache/include/RedisDefine.h"
+#include "cache/include/config.h"
 #include "include/pika_define.h"
 
 using pstd::Status;

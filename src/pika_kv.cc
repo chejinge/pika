@@ -100,6 +100,10 @@ void SetCmd::Do(std::shared_ptr<Slot> slot) {
   }
 }
 
+void SetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do();
+}
+
 void SetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
   switch (condition_) {
     case SetCmd::kXX:
@@ -160,16 +164,6 @@ void GetCmd::DoInitial() {
   key_ = argv_[1];
 }
 
-void GetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
-  auto s = slot->cache()->Get(key_, &value_);
-  if (s.ok()) {
-    res_.AppendStringLenUint64(value_.size());
-    res_.AppendContent(value_);
-    return;
-  }
-  res_.AppendInteger(-1);
-}
-
 void GetCmd::Do(std::shared_ptr<Slot> slot) {
   auto s = slot->db()->GetWithTTL(key_, &value_, &sec_);
   if (s.ok()) {
@@ -180,6 +174,16 @@ void GetCmd::Do(std::shared_ptr<Slot> slot) {
   } else {
     res_.SetRes(CmdRes::kErrOther, s.ToString());
   }
+}
+
+void GetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  auto s = slot->cache()->Get(key_, &value_);
+  if (s.ok()) {
+    res_.AppendStringLenUint64(value_.size());
+    res_.AppendContent(value_);
+    return;
+  }
+  res_.AppendInteger(-1);
 }
 
 void GetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
