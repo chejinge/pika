@@ -230,8 +230,8 @@ enum CmdFlagsMask {
   kCmdFlagsMaskSuspend = 64,
   kCmdFlagsMaskPrior = 128,
   kCmdFlagsMaskAdminRequire = 256,
-  kCmdFlagsMaskPreDo = 512,
   kCmdFlagsMaskCacheDo = 1024,
+  kCmdFlagsMaskPreDo = 2077,
   kCmdFlagsMaskUpdateCache = 2048,
   kCmdFlagsMaskOnlyDoCache = 4096,
   kCmdFlagsMaskSlot = 1536,
@@ -261,8 +261,9 @@ enum CmdFlags {
   kCmdFlagsDoNotSpecifySlot = 0,  // default do not specify slot
   kCmdFlagsSingleSlot = 512,
   kCmdFlagsMultiSlot = 1024,
+  kCmdFlagsPreDo = 2077,
   kCmdFlagsUpdateCache = 2048,
-  kCmdFlagsOnlyDoCache = 4096
+  kCmdFlagsOnlyDoCache = 4096,
 };
 
 void inline RedisAppendContent(std::string& str, const std::string& value);
@@ -299,6 +300,7 @@ class CmdRes {
     kInvalidDB,
     kInconsistentHashTag,
     kErrOther,
+    kCacheMiss,
     KIncrByOverFlow,
   };
 
@@ -309,6 +311,9 @@ class CmdRes {
   void clear() {
     message_.clear();
     ret_ = kNone;
+  }
+  bool CacheMiss() const {
+    return ret_ == kCacheMiss;
   }
   std::string raw_message() const { return message_; }
   std::string message() const {
@@ -474,6 +479,8 @@ class Cmd : public std::enable_shared_from_this<Cmd> {
   bool is_multi_slot() const;
   bool is_need_update_cache() const;
   bool is_only_from_cache() const;
+  bool is_need_read_cache() const;
+  bool need_cache_do() const;
   bool HashtagIsConsistent(const std::string& lhs, const std::string& rhs) const;
   uint64_t GetDoDuration() const { return do_duration_; };
 

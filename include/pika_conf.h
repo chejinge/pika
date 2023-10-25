@@ -306,6 +306,7 @@ class PikaConf : public pstd::BaseConf {
     std::shared_lock l(rwlock_);
     return network_interface_;
   }
+  int cache_model() { return cache_model_; }
   int sync_window_size() { return sync_window_size_.load(); }
   int max_conn_rbuf_size() { return max_conn_rbuf_size_.load(); }
   int consensus_level() { return consensus_level_.load(); }
@@ -326,7 +327,13 @@ class PikaConf : public pstd::BaseConf {
     std::shared_lock l(rwlock_);
     return rate_limiter_auto_tuned_;
   }
-
+  bool IsCacheDisabledTemporarily() { return tmp_cache_disable_flag_; }
+  int cache_string() { return cache_string_; }
+  int cache_set() { return cache_set_; }
+  int cache_zset() { return cache_zset_; }
+  int cache_hash() { return cache_hash_; }
+  int cache_list() { return cache_list_; }
+  int cache_bit() { return cache_bit_; }
   bool enable_blob_files() { return enable_blob_files_; }
   int64_t min_blob_size() { return min_blob_size_; }
   int64_t blob_file_size() { return blob_file_size_; }
