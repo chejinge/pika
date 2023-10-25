@@ -12,6 +12,7 @@
 #include "include/pika_slot_command.h"
 #include "cache/include/RedisCache.h"
 #include "cache/include/RedisDefine.h"
+#include "include/pika_define.h"
 
 extern PikaServer *g_pika_server;
 #define EXTEND_CACHE_SIZE(N) (N * 12 / 10)
@@ -130,45 +131,53 @@ Status PikaCache::RandomKey(std::string *key) {
  * String Commands
  *----------------------------------------------------------------------------*/
 Status PikaCache::Set(std::string &key, std::string &value, int64_t ttl) {
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
   std::unique_lock l(rwlock_);
-  return cache_->Set(key, value, ttl);
+  return cache_->Set(cacheprefixkeyk, value, ttl);
 }
 Status PikaCache::SetWithoutTTL(std::string &key, std::string &value) {
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
   std::unique_lock l(rwlock_);
-  return cache_->SetWithoutTTL(key, value);
+  return cache_->SetWithoutTTL(cacheprefixkeyk, value);
 }
 
 Status PikaCache::Setnx(std::string &key, std::string &value, int64_t ttl) {
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
   std::unique_lock l(rwlock_);
-  return cache_->Setnx(key, value, ttl);
+  return cache_->Setnx(cacheprefixkeyk, value, ttl);
 }
 
 Status PikaCache::SetnxWithoutTTL(std::string &key, std::string &value) {
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
   std::unique_lock l(rwlock_);
-  return cache_->SetnxWithoutTTL(key, value);
+  return cache_->SetnxWithoutTTL(cacheprefixkeyk, value);
 }
 
 Status PikaCache::Setxx(std::string &key, std::string &value, int64_t ttl) {
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
   std::unique_lock l(rwlock_);
-  return cache_->Setxx(key, value, ttl);
+  return cache_->Setxx(cacheprefixkeyk, value, ttl);
 }
 
 Status PikaCache::SetxxWithoutTTL(std::string &key, std::string &value) {
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
   std::unique_lock l(rwlock_);
-  return cache_->SetxxWithoutTTL(key, value);
+  return cache_->SetxxWithoutTTL(cacheprefixkeyk, value);
 }
 Status PikaCache::MSet(const std::vector<storage::KeyValue> &kvs) {
   std::unique_lock l(rwlock_);
   for (const auto &item : kvs) {
     auto [key, value] = item;
-    cache_->SetWithoutTTL(key, value);
+    std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
+    cache_->SetWithoutTTL(cacheprefixkeyk, value);
   }
   return Status::OK();
 }
 
 Status PikaCache::Get(std::string &key, std::string *value) {
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
   std::shared_lock l(rwlock_);
-  return cache_->Get(key, value);
+  return cache_->Get(cacheprefixkeyk, value);
 }
 
 Status PikaCache::MGet(const std::vector<std::string> &keys, std::vector<storage::ValueStatus> *vss) {
@@ -176,7 +185,8 @@ Status PikaCache::MGet(const std::vector<std::string> &keys, std::vector<storage
   vss->resize(keys.size());
   auto ret = Status::OK();
   for (int i = 0; i < keys.size(); ++i) {
-    auto s = cache_->Get(keys[i], &(*vss)[i].value);
+    std::string cacheprefixkeyk = PCacheKeyPrefixK + keys[i];
+    auto s = cache_->Get(cacheprefixkeyk, &(*vss)[i].value);
     (*vss)[i].status = s;
     if (!s.ok()) {
       ret = s;
@@ -187,27 +197,27 @@ Status PikaCache::MGet(const std::vector<std::string> &keys, std::vector<storage
 
 Status PikaCache::Incrxx(std::string &key) {
   std::unique_lock l(rwlock_);
-  if (cache_->Exists(key)) {
-    return cache_->Incr(key);
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
+  if (cache_->Exists(cacheprefixkeyk)) {
+    return cache_->Incr(cacheprefixkeyk);
   }
   return Status::NotFound("key not exist");
 }
 
 Status PikaCache::Decrxx(std::string &key) {
   std::unique_lock l(rwlock_);
-
-  
-  
-  if (cache_->Exists(key)) {
-    return cache_->Decr(key);
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
+  if (cache_->Exists(cacheprefixkeyk)) {
+    return cache_->Decr(cacheprefixkeyk);
   }
   return Status::NotFound("key not exist");
 }
 
 Status PikaCache::IncrByxx(std::string &key, long long incr) {
   std::unique_lock l(rwlock_);
-  if (cache_->Exists(key)) {
-    return cache_->IncrBy(key, incr);
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
+  if (cache_->Exists(cacheprefixkeyk)) {
+    return cache_->IncrBy(cacheprefixkeyk, incr);
   }
   return Status::NotFound("key not exist");
 }
@@ -215,10 +225,9 @@ Status PikaCache::IncrByxx(std::string &key, long long incr) {
 Status PikaCache::DecrByxx(std::string &key, long long incr) {
   std::unique_lock l(rwlock_);
 
-  
-  
-  if (cache_->Exists(key)) {
-    return cache_->DecrBy(key, incr);
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
+  if (cache_->Exists(cacheprefixkeyk)) {
+    return cache_->DecrBy(cacheprefixkeyk, incr);
   }
   return Status::NotFound("key not exist");
 }
@@ -226,18 +235,19 @@ Status PikaCache::DecrByxx(std::string &key, long long incr) {
 Status PikaCache::Incrbyfloatxx(std::string &key, long double incr) {
   std::unique_lock l(rwlock_);
 
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
   
-  
-  if (cache_->Exists(key)) {
-    return cache_->Incrbyfloat(key, incr);
+  if (cache_->Exists(cacheprefixkeyk)) {
+    return cache_->Incrbyfloat(cacheprefixkeyk, incr);
   }
   return Status::NotFound("key not exist");
 }
 
 Status PikaCache::Appendxx(std::string &key, std::string &value) {
   std::unique_lock l(rwlock_);
-  if (cache_->Exists(key)) {
-    return cache_->Append(key, value);
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
+  if (cache_->Exists(cacheprefixkeyk)) {
+    return cache_->Append(cacheprefixkeyk, value);
   }
   return Status::NotFound("key not exist");
 }
@@ -246,17 +256,17 @@ Status PikaCache::GetRange(std::string &key, int64_t start, int64_t end, std::st
   std::unique_lock l(rwlock_);
 
   
-  
-  return cache_->GetRange(key, start, end, value);
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
+  return cache_->GetRange(cacheprefixkeyk, start, end, value);
 }
 
 Status PikaCache::SetRangexx(std::string &key, int64_t start, std::string &value) {
   std::unique_lock l(rwlock_);
 
   
-  
-  if (cache_->Exists(key)) {
-    return cache_->SetRange(key, start, value);
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
+  if (cache_->Exists(cacheprefixkeyk)) {
+    return cache_->SetRange(cacheprefixkeyk, start, value);
   }
   return Status::NotFound("key not exist");
 }
@@ -265,8 +275,8 @@ Status PikaCache::Strlen(std::string &key, int32_t *len) {
   std::unique_lock l(rwlock_);
 
   
-  
-  return cache_->Strlen(key, len);
+  std::string cacheprefixkeyk = PCacheKeyPrefixK + key;
+  return cache_->Strlen(cacheprefixkeyk, len);
 }
 
 /*-----------------------------------------------------------------------------

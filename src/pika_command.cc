@@ -174,7 +174,7 @@ void InitCmdTable(CmdTable* cmd_table) {
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameSet, std::move(setptr)));
   ////GetCmd
   std::unique_ptr<Cmd> getptr =
-      std::make_unique<GetCmd>(kCmdNameGet, 2, kCmdFlagsRead | kCmdFlagsSingleSlot | kCmdFlagsKv | kCmdFlagsUpdateCache);
+      std::make_unique<GetCmd>(kCmdNameGet, 2, kCmdFlagsRead | kCmdFlagsSingleSlot | kCmdFlagsKv | kCmdFlagsUpdateCache | kCmdFlagsPreDo);
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameGet, std::move(getptr)));
   ////DelCmd
   std::unique_ptr<Cmd> delptr =
@@ -830,21 +830,29 @@ void Cmd::DoCommand(const std::shared_ptr<Slot>& slot, const HintKeys& hint_keys
   if (!is_suspend()) {
     slot->DbRWLockReader();
   }
-  DEFER {
-    if (!is_suspend()) {
-      slot->DbRWUnLock();
-    }
-  };
+  if (need_cache_do()
+      && PIKA_CACHE_NONE != g_pika_conf->cache_model()
+      && PIKA_CACHE_STATUS_OK == g_pika_server->Cache()->CacheStatus()) {
 
-  DoFromCache(slot);
-  if (is_only_from_cache() && res_.ok()) {
-    return;
+    if (is_need_read_cache()) {
+      DoFromCache(slot);
+    }
+    if (is_read()) {
+      Do(slot);
+      if (is_need_update_cache()) {
+        DoUpdateCache(slot);
+      }
+    } else if (is_write()) {
+      Do(slot);
+      if (is_need_update_cache()) {
+        DoUpdateCache(slot);
+      }
+    }
+  } else {
+    Do(slot);
   }
-  res_.clear();
-  Do(slot);
-  //TODO(pia_cache): should write a new function for determine whether the cache needs to be updated
-  if (res_.ok()) {
-    DoUpdateCache(slot);
+  if (!is_suspend()) {
+    slot->DbRWUnLock();
   }
 }
 
@@ -946,6 +954,41 @@ bool Cmd::is_single_slot() const { return ((flag_ & kCmdFlagsMaskSlot) == kCmdFl
 bool Cmd::is_multi_slot() const { return ((flag_ & kCmdFlagsMaskSlot) == kCmdFlagsMultiSlot); }
 bool Cmd::is_need_update_cache() const { return ((flag_ & kCmdFlagsMaskUpdateCache) == kCmdFlagsUpdateCache);  }
 bool Cmd::is_only_from_cache() const { return ((flag_ & kCmdFlagsMaskOnlyDoCache) == kCmdFlagsOnlyDoCache); }
+bool Cmd::need_cache_do() const {
+  if (g_pika_conf->IsCacheDisabledTemporarily()) {
+    return false;
+  }
+
+  if ((flag_ & kCmdFlagsKv) == kCmdFlagsKv) {
+    if (!g_pika_conf->cache_string()) {
+      return false;
+    }
+  } else if ((flag_ & kCmdFlagsSet) == kCmdFlagsSet) {
+    if (!g_pika_conf->cache_set()) {
+      return false;
+    }
+  } else if ((flag_ & kCmdFlagsZset) == kCmdFlagsZset) {
+    if (!g_pika_conf->cache_zset()) {
+      return false;
+    }
+  } else if ((flag_ & kCmdFlagsHash) == kCmdFlagsHash){
+    if (!g_pika_conf->cache_hash()) {
+      return false;
+    }
+  } else if ((flag_ & kCmdFlagsList) == kCmdFlagsList) {
+    if (!g_pika_conf->cache_list()) {
+      return false;
+    }
+  } else if ((flag_ & kCmdFlagsBit) == kCmdFlagsBit) {
+    if (!g_pika_conf->cache_bit()) {
+      return false;
+    }
+  }
+  return ((flag_ & kCmdFlagsMaskUpdateCache) == kCmdFlagsUpdateCache);
+}
+
+bool Cmd::is_need_read_cache() const { return ((flag_ & kCmdFlagsMaskPreDo) == kCmdFlagsPreDo); }
+
 
 bool Cmd::HashtagIsConsistent(const std::string& lhs, const std::string& rhs) const { return true; }
 
