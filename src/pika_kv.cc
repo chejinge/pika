@@ -101,7 +101,7 @@ void SetCmd::Do(std::shared_ptr<Slot> slot) {
 }
 
 void SetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
-  Do();
+  Do(slot);
 }
 
 void SetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
@@ -177,17 +177,32 @@ void GetCmd::Do(std::shared_ptr<Slot> slot) {
 }
 
 void GetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
-  auto s = slot->cache()->Get(key_, &value_);
-  if (s.ok()) {
+  res_.clear();
+  s_ = slot->db()->GetWithTTL(key_, &value_,&sec_);
+  if (s_.ok()) {
     res_.AppendStringLenUint64(value_.size());
     res_.AppendContent(value_);
-    return;
+  } else if (s_.IsNotFound()) {
+    res_.AppendStringLen(-1);
+  } else {
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
   }
-  res_.AppendInteger(-1);
 }
 
 void GetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
-  slot->cache()->Set(key_, value_, sec_);
+  if (s_.ok()) {
+    slot->cache()->Set(key_, value_, sec_);
+  }
+}
+
+void GetCmd::PreDo(std::shared_ptr<Slot> slot) {
+  auto s = slot->cache()->Get(key_, &value_);
+  if (s.ok()) {
+    res_.AppendStringLen(value_.size());
+    res_.AppendContent(value_);
+  } else {
+    res_.SetRes(CmdRes::kCacheMiss);
+  }
 }
 
 void DelCmd::DoInitial() {
@@ -204,17 +219,32 @@ void DelCmd::Do(std::shared_ptr<Slot> slot) {
   int64_t count = slot->db()->Del(keys_, &type_status);
   if (count >= 0) {
     res_.AppendInteger(count);
+    s_ = rocksdb::Status::OK();
     std::vector<std::string>::const_iterator it;
     for (it = keys_.begin(); it != keys_.end(); it++) {
       RemSlotKey(*it, slot);
     }
   } else {
     res_.SetRes(CmdRes::kErrOther, "delete error");
+    s_ = rocksdb::Status::Corruption("delete error");
   }
-  if (count >= 0 && is_need_update_cache()) {
+}
+
+void DelCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  if (1 < keys_.size()) {
+    res_.SetRes(CmdRes::kErrOther, "only can delete one key in cache model");
+    return;
+  }
+
+  Do();
+}
+
+void DelCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok() && 1 < keys_.size()) {
     slot->cache()->Del(keys_);
   }
 }
+
 
 void DelCmd::Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) {
   std::map<storage::DataType, storage::Status> type_status;
@@ -261,8 +291,12 @@ void IncrCmd::Do(std::shared_ptr<Slot> slot) {
   }
 }
 
+void IncrCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do(slot);
+}
+
 void IncrCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
-  slot->cache()->IncrByxx(key_, 1);
+  slot->cache()->Incrxx(key_);
 }
 
 void IncrbyCmd::DoInitial() {
@@ -278,18 +312,25 @@ void IncrbyCmd::DoInitial() {
 }
 
 void IncrbyCmd::Do(std::shared_ptr<Slot> slot) {
-  rocksdb::Status s = slot->db()->Incrby(key_, by_, &new_value_);
-  if (s.ok()) {
+  s_ = slot->db()->Incrby(key_, by_, &new_value_);
+  if (s_.ok()) {
     res_.AppendContent(":" + std::to_string(new_value_));
     AddSlotKey("k", key_, slot);
-  } else if (s.IsCorruption() && s.ToString() == "Corruption: Value is not a integer") {
+  } else if (s_.IsCorruption() && s_.ToString() == "Corruption: Value is not a integer") {
     res_.SetRes(CmdRes::kInvalidInt);
-  } else if (s.IsInvalidArgument()) {
+  } else if (s_.IsInvalidArgument()) {
     res_.SetRes(CmdRes::kOverFlow);
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
   }
-  if (res_.ok() && is_need_update_cache()) {
+}
+
+void IncrbyCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do(slot);
+}
+
+void IncrbyCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
     slot->cache()->IncrByxx(key_, by_);
   }
 }
@@ -308,17 +349,30 @@ void IncrbyfloatCmd::DoInitial() {
 }
 
 void IncrbyfloatCmd::Do(std::shared_ptr<Slot> slot) {
-  rocksdb::Status s = slot->db()->Incrbyfloat(key_, value_, &new_value_);
-  if (s.ok()) {
+  s_ = slot->db()->Incrbyfloat(key_, value_, &new_value_);
+  if (s_.ok()) {
     res_.AppendStringLenUint64(new_value_.size());
     res_.AppendContent(new_value_);
     AddSlotKey("k", key_, slot);
-  } else if (s.IsCorruption() && s.ToString() == "Corruption: Value is not a vaild float") {
+  } else if (s_.IsCorruption() && s_.ToString() == "Corruption: Value is not a vaild float") {
     res_.SetRes(CmdRes::kInvalidFloat);
-  } else if (s.IsInvalidArgument()) {
+  } else if (s_.IsInvalidArgument()) {
     res_.SetRes(CmdRes::KIncrByOverFlow);
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
+  }
+}
+
+void IncrbyfloatCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do();
+}
+
+void IncrbyfloatCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    long double long_double_by;
+    if (storage::StrToLongDouble(value_.data(), value_.size(), &long_double_by) != -1) {
+      slot->cache()->Incrbyfloatxx(key_, long_double_by);
+    }
   }
 }
 
@@ -331,15 +385,25 @@ void DecrCmd::DoInitial() {
 }
 
 void DecrCmd::Do(std::shared_ptr<Slot> slot) {
-  rocksdb::Status s = slot->db()->Decrby(key_, 1, &new_value_);
-  if (s.ok()) {
+  s_= slot->db()->Decrby(key_, 1, &new_value_);
+  if (s_.ok()) {
     res_.AppendContent(":" + std::to_string(new_value_));
-  } else if (s.IsCorruption() && s.ToString() == "Corruption: Value is not a integer") {
+  } else if (s_.IsCorruption() && s_.ToString() == "Corruption: Value is not a integer") {
     res_.SetRes(CmdRes::kInvalidInt);
-  } else if (s.IsInvalidArgument()) {
+  } else if (s_.IsInvalidArgument()) {
     res_.SetRes(CmdRes::kOverFlow);
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
+  }
+}
+
+void DecrCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do();
+}
+
+void DecrCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->Decrxx(key_);
   }
 }
 
@@ -356,17 +420,24 @@ void DecrbyCmd::DoInitial() {
 }
 
 void DecrbyCmd::Do(std::shared_ptr<Slot> slot) {
-  rocksdb::Status s = slot->db()->Decrby(key_, by_, &new_value_);
-  if (s.ok()) {
+  s_ = slot->db()->Decrby(key_, by_, &new_value_);
+  if (s_.ok()) {
     res_.AppendContent(":" + std::to_string(new_value_));
-  } else if (s.IsCorruption() && s.ToString() == "Corruption: Value is not a integer") {
+  } else if (s_.IsCorruption() && s_.ToString() == "Corruption: Value is not a integer") {
     res_.SetRes(CmdRes::kInvalidInt);
-  } else if (s.IsInvalidArgument()) {
+  } else if (s_.IsInvalidArgument()) {
     res_.SetRes(CmdRes::kOverFlow);
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
   }
-  if (res_.ok() && is_need_update_cache()) {
+}
+
+void DecrbyCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do();
+}
+
+void DecrbyCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
     slot->cache()->DecrByxx(key_, by_);
   }
 }
@@ -382,8 +453,8 @@ void GetsetCmd::DoInitial() {
 
 void GetsetCmd::Do(std::shared_ptr<Slot> slot) {
   std::string old_value;
-  rocksdb::Status s = slot->db()->GetSet(key_, new_value_, &old_value);
-  if (s.ok()) {
+   s_ = slot->db()->GetSet(key_, new_value_, &old_value);
+  if (s_.ok()) {
     if (old_value.empty()) {
       res_.AppendContent("$-1");
     } else {
@@ -392,10 +463,20 @@ void GetsetCmd::Do(std::shared_ptr<Slot> slot) {
     }
     AddSlotKey("k", key_, slot);
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
   }
   if (res_.ok() && is_need_update_cache()) {
     slot->cache()->SetWithoutTTL(key_, new_value_);
+  }
+}
+
+void GetsetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do();
+}
+
+void GetsetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->SetxxWithoutTTL(key_, new_value_);
   }
 }
 
@@ -410,14 +491,24 @@ void AppendCmd::DoInitial() {
 
 void AppendCmd::Do(std::shared_ptr<Slot> slot) {
   int32_t new_len = 0;
-  rocksdb::Status s = slot->db()->Append(key_, value_, &new_len);
-  if (s.ok() || s.IsNotFound()) {
+  s_ = slot->db()->Append(key_, value_, &new_len);
+  if (s_.ok() || s_.IsNotFound()) {
     res_.AppendInteger(new_len);
     AddSlotKey("k", key_, slot);
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
   }
   if (res_.ok() && is_need_update_cache()) {
+    slot->cache()->Appendxx(key_, value_);
+  }
+}
+
+void AppendCmd::DoFromCache(std::shared_ptr<Slot> slot){
+  Do();
+}
+
+void AppendCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
     slot->cache()->Appendxx(key_, value_);
   }
 }
@@ -431,10 +522,45 @@ void MgetCmd::DoInitial() {
   keys_.erase(keys_.begin());
   split_res_.resize(keys_.size());
 }
+
+void MgetCmd::Do(std::shared_ptr<Slot> slot) {
+  std::vector<storage::ValueStatus> vss;
+  s_ = slot->db()->MGet(keys_, &vss);
+  if (s_.ok()) {
+    res_.AppendArrayLenUint64(vss.size());
+    for (const auto& vs : vss) {
+      if (vs.status.ok()) {
+        res_.AppendStringLenUint64(vs.value.size());
+        res_.AppendContent(vs.value);
+      } else {
+        res_.AppendContent("$-1");
+      }
+    }
+  } else {
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
+  }
+}
+
+void MgetCmd::PreDo(std::shared_ptr<Slot> slot) {
+  if (1 < keys_.size()) {
+    res_.SetRes(CmdRes::kErrOther, "only can get one key in cache model");
+    return;
+  }
+
+  s_ = slot->cache()->Get(keys_[0], &value_);
+  if (s_.ok()) {
+    res_.AppendArrayLen(1);
+    res_.AppendStringLen(value_.size());
+    res_.AppendContent(value_);
+  } else {
+    res_.SetRes(CmdRes::kCacheMiss);
+  }
+}
+
 void MgetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
   std::vector<storage::ValueStatus> vss;
-  auto status = slot->cache()->MGet(keys_, &vss);
-  if (!status.ok()) {
+  s_ = slot->cache()->MGet(keys_, &vss);
+  if (!s_.ok()) {
     res_.SetRes(CmdRes::kNotFound);
     return;
   }
@@ -449,25 +575,10 @@ void MgetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
   }
 }
 
-void MgetCmd::Do(std::shared_ptr<Slot> slot) {
-  std::vector<storage::ValueStatus> vss;
-  auto status = slot->db()->MGet(keys_, &vss);
-  if (status.ok()) {
-    res_.AppendArrayLenUint64(vss.size());
-    for (const auto& vs : vss) {
-      if (vs.status.ok()) {
-        res_.AppendStringLenUint64(vs.value.size());
-        res_.AppendContent(vs.value);
-      } else {
-        res_.AppendContent("$-1");
-      }
-    }
-  } else {
-    res_.SetRes(CmdRes::kErrOther, status.ToString());
-  }
-}
-
 void MgetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->WriteKvToCache(keys_[0], value_, ttl_);
+  }
 }
 
 void MgetCmd::Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) {
@@ -608,15 +719,25 @@ void SetexCmd::DoInitial() {
 }
 
 void SetexCmd::Do(std::shared_ptr<Slot> slot) {
-  rocksdb::Status s = slot->db()->Setex(key_, value_, static_cast<int32_t>(sec_));
-  if (s.ok()) {
+  s_ = slot->db()->Setex(key_, value_, static_cast<int32_t>(sec_));
+  if (s_.ok()) {
     res_.SetRes(CmdRes::kOk);
     AddSlotKey("k", key_, slot);
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
   }
   if (res_.ok() && is_need_update_cache()) {
     slot->cache()->Set(key_, value_, sec_);
+  }
+}
+
+void SetexCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do(slot);
+}
+
+void SetexCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->Setxx(key_, value_, sec_);
   }
 }
 
@@ -734,18 +855,30 @@ void MsetCmd::DoInitial() {
 }
 
 void MsetCmd::Do(std::shared_ptr<Slot> slot) {
-  storage::Status s = slot->db()->MSet(kvs_);
-  if (s.ok()) {
+   s_ = slot->db()->MSet(kvs_);
+  if (s_.ok()) {
     res_.SetRes(CmdRes::kOk);
     std::vector<storage::KeyValue>::const_iterator it;
     for (it = kvs_.begin(); it != kvs_.end(); it++) {
       AddSlotKey("k", it->key, slot);
     }
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
   }
-  if (res_.ok() && is_need_update_cache()) {
-    slot->cache()->MSet(kvs_);
+}
+
+void MsetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  if (1 < kvs_.size()) {
+    res_.SetRes(CmdRes::kErrOther, "only can mset one kv in cache model");
+    return;
+  }
+
+  Do();
+}
+
+void MsetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->SetxxWithoutTTL(kvs_[0].key, kvs_[0].value);
   }
 }
 
@@ -879,12 +1012,22 @@ void SetrangeCmd::DoInitial() {
 
 void SetrangeCmd::Do(std::shared_ptr<Slot> slot) {
   int32_t new_len;
-  rocksdb::Status s = slot->db()->Setrange(key_, offset_, value_, &new_len);
-  if (s.ok()) {
+  s_ = slot->db()->Setrange(key_, offset_, value_, &new_len);
+  if (s_.ok()) {
     res_.AppendInteger(new_len);
     AddSlotKey("k", key_, slot);
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
+  }
+}
+
+void SetrangeCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do(slot);
+}
+
+void SetrangeCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->SetRangexx(key_, offset_, value_);
   }
 }
 
@@ -898,11 +1041,11 @@ void StrlenCmd::DoInitial() {
 
 void StrlenCmd::Do(std::shared_ptr<Slot> slot) {
   int32_t len = 0;
-  rocksdb::Status s = slot->db()->Strlen(key_, &len);
-  if (s.ok() || s.IsNotFound()) {
+  s_ = slot->db()->Strlen(key_, &len);
+  if (s_.ok() || s_.IsNotFound()) {
     res_.AppendInteger(len);
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
   }
 }
 
@@ -913,6 +1056,32 @@ void ExistsCmd::DoInitial() {
   }
   keys_ = argv_;
   keys_.erase(keys_.begin());
+}
+
+void StrlenCmd::PreDo(std::shared_ptr<Slot> slot) {
+  int32_t len = 0;
+  s_ = slot->cache()->Strlen(key_, &len);
+  if (s_.ok()) {
+    res_.AppendInteger(len);
+  } else {
+    res_.SetRes(CmdRes::kCacheMiss);
+  }
+}
+
+void StrlenCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  res_.clear();
+  s_ = slot->db()->GetWithTTL(key_, &value_, &sec_);
+  if (s_.ok() || s_.IsNotFound()) {
+    res_.AppendInteger(value_.size());
+  } else {
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
+  }
+}
+
+void StrlenCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->WriteKvToCache(key_, value_, sec_);
+  }
 }
 
 void ExistsCmd::Do(std::shared_ptr<Slot> slot) {
@@ -954,8 +1123,10 @@ void ExpireCmd::Do(std::shared_ptr<Slot> slot) {
   int64_t res = slot->db()->Expire(key_, static_cast<int32_t>(sec_), &type_status);
   if (res != -1) {
     res_.AppendInteger(res);
+    s_ = rocksdb::Status::OK();
   } else {
     res_.SetRes(CmdRes::kErrOther, "expire internal error");
+    s_ = rocksdb::Status::Corruption("expire internal error");
   }
 }
 
@@ -984,6 +1155,17 @@ std::string ExpireCmd::ToBinlog(uint32_t exec_time, uint32_t term_id, uint64_t l
                                              content, {});
 }
 
+void ExpireCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do(slot);
+}
+
+void ExpireCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->Expire(key_, sec_);
+  }
+}
+
+
 void PexpireCmd::DoInitial() {
   if (!CheckArg(argv_.size())) {
     res_.SetRes(CmdRes::kWrongNum, kCmdNamePexpire);
@@ -1001,8 +1183,10 @@ void PexpireCmd::Do(std::shared_ptr<Slot> slot) {
   int64_t res = slot->db()->Expire(key_, static_cast<int32_t>(msec_ / 1000), &type_status);
   if (res != -1) {
     res_.AppendInteger(res);
+    s_ = rocksdb::Status::OK();
   } else {
     res_.SetRes(CmdRes::kErrOther, "expire internal error");
+    s_ = rocksdb::Status::Corruption("expire internal error");
   }
 }
 
@@ -1031,6 +1215,16 @@ std::string PexpireCmd::ToBinlog(uint32_t exec_time, uint32_t term_id, uint64_t 
                                              content, {});
 }
 
+void PexpireCmd::DoFromCache(std::shared_ptr<Slot> slot){
+  Do(slot);
+}
+
+void PexpireCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->Expire(key_, msec_/1000);
+  }
+}
+
 void ExpireatCmd::DoInitial() {
   if (!CheckArg(argv_.size())) {
     res_.SetRes(CmdRes::kWrongNum, kCmdNameExpireat);
@@ -1048,8 +1242,21 @@ void ExpireatCmd::Do(std::shared_ptr<Slot> slot) {
   int32_t res = slot->db()->Expireat(key_, static_cast<int32_t>(time_stamp_), &type_status);
   if (res != -1) {
     res_.AppendInteger(res);
+    s_ = rocksdb::Status::OK();
+
   } else {
     res_.SetRes(CmdRes::kErrOther, "expireat internal error");
+    s_ = rocksdb::Status::Corruption("expireat internal error");
+  }
+}
+
+void ExpireatCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do(slot);
+}
+
+void ExpireatCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->Expireat(key_, time_stamp_);
   }
 }
 
@@ -1095,8 +1302,20 @@ void PexpireatCmd::Do(std::shared_ptr<Slot> slot) {
   int32_t res = slot->db()->Expireat(key_, static_cast<int32_t>(time_stamp_ms_ / 1000), &type_status);
   if (res != -1) {
     res_.AppendInteger(res);
+    s_ = rocksdb::Status::OK();
   } else {
     res_.SetRes(CmdRes::kErrOther, "pexpireat internal error");
+    s_ = rocksdb::Status::Corruption("pexpireat internal error");
+  }
+}
+
+void PexpireatCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do(slot);
+}
+
+void PexpireatCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->Expireat(key_, time_stamp_ms_/1000);
   }
 }
 
@@ -1133,6 +1352,21 @@ void TtlCmd::Do(std::shared_ptr<Slot> slot) {
     // mean this key not exist
     res_.AppendInteger(-2);
   }
+}
+
+void TtlCmd::PreDo(std::shared_ptr<Slot> slot) {
+  int64_t ttl;
+  rocksdb::Status s = slot->cache()->TTL(key_, &ttl);
+  if (s.ok()) {
+    res_.AppendInteger(ttl);
+  } else {
+    res_.SetRes(CmdRes::kCacheMiss);
+  }
+}
+
+void TtlCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  res_.clear();
+  Do(slot);
 }
 
 void PttlCmd::DoInitial() {
@@ -1190,6 +1424,21 @@ void PttlCmd::Do(std::shared_ptr<Slot> slot) {
   }
 }
 
+void PttlCmd::PreDo(std::shared_ptr<Slot> slot) {
+  int64_t ttl;
+  s_ = slot->cache()->TTL(key_, &ttl);
+  if (s_.ok()) {
+    res_.AppendInteger(ttl * 1000);
+  } else {
+    res_.SetRes(CmdRes::kCacheMiss);
+  }
+}
+
+void PttlCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  res_.clear();
+  Do(slot);
+}
+
 void PersistCmd::DoInitial() {
   if (!CheckArg(argv_.size())) {
     res_.SetRes(CmdRes::kWrongNum, kCmdNamePersist);
@@ -1203,8 +1452,20 @@ void PersistCmd::Do(std::shared_ptr<Slot> slot) {
   int32_t res = slot->db()->Persist(key_, &type_status);
   if (res != -1) {
     res_.AppendInteger(res);
+    s_ = rocksdb::Status::OK();
   } else {
     res_.SetRes(CmdRes::kErrOther, "persist internal error");
+    s_ = rocksdb::Status::Corruption("persist internal error");
+  }
+}
+
+void PersistCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  Do(slot);
+}
+
+void PersistCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
+  if (s_.ok()) {
+    slot->cache()->Persist(key_);
   }
 }
 
@@ -1218,12 +1479,27 @@ void TypeCmd::DoInitial() {
 
 void TypeCmd::Do(std::shared_ptr<Slot> slot) {
   std::vector<std::string> types(1);
-  rocksdb::Status s = slot->db()->GetType(key_, true, types);
-  if (s.ok()) {
+  s_ = slot->db()->GetType(key_, true, types);
+  if (s_.ok()) {
     res_.AppendContent("+" + types[0]);
   } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
   }
+}
+
+void TypeCmd::PreDo(std::shared_ptr<Slot> slot) {
+  std::string type;
+  s_ = slot->cache()->Type(key_, &type);
+  if (s_.ok()) {
+    res_.AppendContent("+" + type);
+  } else {
+    res_.SetRes(CmdRes::kCacheMiss);
+  }
+}
+
+void TypeCmd::DoFromCache(std::shared_ptr<Slot> slot) {
+  res_.clear();
+  Do(slot);
 }
 
 void PTypeCmd::DoInitial() {
