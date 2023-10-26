@@ -29,7 +29,7 @@ void PikaCacheManager::ProcessCronTask() {
   for (auto& cache : caches_) {
     cache.second->ActiveExpireCycle();
   }
-  LOG(INFO) << "hit rate:" << HitRatio() << std::endl;
+  //LOG(INFO) << "hit rate:" << HitRatio() << std::endl;
 }
 
 double PikaCacheManager::HitRatio(void) {

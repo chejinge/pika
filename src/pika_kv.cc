@@ -101,7 +101,7 @@ void SetCmd::Do(std::shared_ptr<Slot> slot) {
 }
 
 void SetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
-  Do();
+  Do(slot);
 }
 
 void SetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
@@ -177,17 +177,32 @@ void GetCmd::Do(std::shared_ptr<Slot> slot) {
 }
 
 void GetCmd::DoFromCache(std::shared_ptr<Slot> slot) {
-  auto s = slot->cache()->Get(key_, &value_);
-  if (s.ok()) {
+  res_.clear();
+  s_ = slot->db()->GetWithTTL(key_, &value_,&sec_);
+  if (s_.ok()) {
     res_.AppendStringLenUint64(value_.size());
     res_.AppendContent(value_);
-    return;
+  } else if (s_.IsNotFound()) {
+    res_.AppendStringLen(-1);
+  } else {
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
   }
-  res_.AppendInteger(-1);
 }
 
 void GetCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
-  slot->cache()->Set(key_, value_, sec_);
+  if (s_.ok()) {
+    slot->cache()->Set(key_, value_, sec_);
+  }
+}
+
+void GetCmd::PreDo(std::shared_ptr<Slot> slot) {
+  auto s = slot->cache()->Get(key_, &value_);
+  if (s.ok()) {
+    res_.AppendStringLen(value_.size());
+    res_.AppendContent(value_);
+  } else {
+    res_.SetRes(CmdRes::kCacheMiss);
+  }
 }
 
 void DelCmd::DoInitial() {

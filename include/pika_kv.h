@@ -58,7 +58,7 @@ class GetCmd : public Cmd {
   void Do(std::shared_ptr<Slot> slot = nullptr) override;
   void DoFromCache(std::shared_ptr<Slot> slot = nullptr) override;
   void DoUpdateCache(std::shared_ptr<Slot> slot = nullptr) override;
-  //void PreDo(std::shared_ptr<Slot> slot = nullptr);
+  void PreDo(std::shared_ptr<Slot> slot = nullptr) override;
   void Split(std::shared_ptr<Slot> slot, const HintKeys& hint_keys) override{};
   void Merge() override{};
   Cmd* Clone() override { return new GetCmd(*this); }

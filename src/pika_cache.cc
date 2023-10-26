@@ -60,7 +60,10 @@ void PikaCache::Destroy(void) {
 
 void PikaCache::SetCacheStatus(int status) { cache_status_ = status; }
 
-int PikaCache::CacheStatus(void) { return cache_status_; }
+int PikaCache::CacheStatus(void) {
+  LOG(INFO) << "er";
+  return cache_status_;
+}
 
 /*-----------------------------------------------------------------------------
  * Normal Commands
