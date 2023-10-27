@@ -231,7 +231,7 @@ enum CmdFlagsMask {
   kCmdFlagsMaskPrior = 128,
   kCmdFlagsMaskAdminRequire = 256,
   kCmdFlagsMaskCacheDo = 1024,
-  kCmdFlagsMaskPreDo = 512,
+  kCmdFlagsMaskPreDo = 128,
   kCmdFlagsMaskUpdateCache = 2048,
   kCmdFlagsMaskOnlyDoCache = 4096,
   kCmdFlagsMaskSlot = 1536,
@@ -261,9 +261,9 @@ enum CmdFlags {
   kCmdFlagsDoNotSpecifySlot = 0,  // default do not specify slot
   kCmdFlagsSingleSlot = 512,
   kCmdFlagsMultiSlot = 1024,
-  kCmdFlagsPreDo = 512,
+  kCmdFlagsPreDo = 128,
   kCmdFlagsUpdateCache = 2048,
-  kCmdFlagsOnlyDoCache = 4096,
+  kCmdFlagsDoFromCache = 4096,
 };
 
 void inline RedisAppendContent(std::string& str, const std::string& value);
