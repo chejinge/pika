@@ -23,6 +23,7 @@
 #include "include/pika_slot_command.h"
 #include "include/pika_zset.h"
 #include "pstd_defer.h"
+#include "include/pika_cache.h"
 
 using pstd::Status;
 
@@ -170,18 +171,18 @@ void InitCmdTable(CmdTable* cmd_table) {
   // Kv
   ////SetCmd
   std::unique_ptr<Cmd> setptr =
-      std::make_unique<SetCmd>(kCmdNameSet, -3, kCmdFlagsWrite | kCmdFlagsSingleSlot | kCmdFlagsKv | kCmdFlagsUpdateCache);
+      std::make_unique<SetCmd>(kCmdNameSet, -3, kCmdFlagsWrite | kCmdFlagsSingleSlot | kCmdFlagsKv | kCmdFlagsDoFromCache | kCmdFlagsUpdateCache );
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameSet, std::move(setptr)));
   ////GetCmd
   std::unique_ptr<Cmd> getptr =
-      std::make_unique<GetCmd>(kCmdNameGet, 2, kCmdFlagsRead | kCmdFlagsSingleSlot | kCmdFlagsKv | kCmdFlagsUpdateCache);
+      std::make_unique<GetCmd>(kCmdNameGet, 2, kCmdFlagsRead | kCmdFlagsSingleSlot | kCmdFlagsKv | kCmdFlagsDoFromCache | kCmdFlagsUpdateCache | kCmdFlagsPreDo);
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameGet, std::move(getptr)));
   ////DelCmd
   std::unique_ptr<Cmd> delptr =
-      std::make_unique<DelCmd>(kCmdNameDel, -2, kCmdFlagsWrite | kCmdFlagsMultiSlot | kCmdFlagsKv | kCmdFlagsUpdateCache);
+      std::make_unique<DelCmd>(kCmdNameDel, -2, kCmdFlagsWrite | kCmdFlagsMultiSlot | kCmdFlagsKv | kCmdFlagsDoFromCache | kCmdFlagsUpdateCache );
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameDel, std::move(delptr)));
   std::unique_ptr<Cmd> Unlinkptr =
-      std::make_unique<DelCmd>(kCmdNameUnlink, -2, kCmdFlagsWrite | kCmdFlagsMultiSlot | kCmdFlagsKv | kCmdFlagsUpdateCache);
+      std::make_unique<DelCmd>(kCmdNameUnlink, -2, kCmdFlagsWrite | kCmdFlagsMultiSlot | kCmdFlagsKv );
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameUnlink, std::move(Unlinkptr)));
   ////IncrCmd
   std::unique_ptr<Cmd> incrptr =
@@ -213,7 +214,7 @@ void InitCmdTable(CmdTable* cmd_table) {
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameAppend, std::move(appendptr)));
   ////MgetCmd
   std::unique_ptr<Cmd> mgetptr =
-      std::make_unique<MgetCmd>(kCmdNameMget, -2, kCmdFlagsRead | kCmdFlagsMultiSlot | kCmdFlagsKv);
+      std::make_unique<MgetCmd>(kCmdNameMget, -2, kCmdFlagsRead | kCmdFlagsMultiSlot | kCmdFlagsKv | kCmdFlagsDoFromCache | kCmdFlagsUpdateCache | kCmdFlagsPreDo);
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameMget, std::move(mgetptr)));
   ////KeysCmd
   std::unique_ptr<Cmd> keysptr =
@@ -237,7 +238,7 @@ void InitCmdTable(CmdTable* cmd_table) {
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameDelvx, std::move(delvxptr)));
   ////MSetCmd
   std::unique_ptr<Cmd> msetptr =
-      std::make_unique<MsetCmd>(kCmdNameMset, -3, kCmdFlagsWrite | kCmdFlagsMultiSlot | kCmdFlagsKv);
+      std::make_unique<MsetCmd>(kCmdNameMset, -3, kCmdFlagsWrite | kCmdFlagsMultiSlot | kCmdFlagsKv | kCmdFlagsDoFromCache | kCmdFlagsUpdateCache);
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameMset, std::move(msetptr)));
   ////MSetnxCmd
   std::unique_ptr<Cmd> msetnxptr =
@@ -831,20 +832,19 @@ void Cmd::DoCommand(const std::shared_ptr<Slot>& slot, const HintKeys& hint_keys
     slot->DbRWLockReader();
   }
   if (need_cache_do()
-      && PIKA_CACHE_NONE != g_pika_conf->cache_model()
-      && PIKA_CACHE_STATUS_OK == g_pika_server->Cache()->CacheStatus()) {
-
+      && PIKA_CACHE_NONE != g_pika_conf->cache_model()){
+      //&& PIKA_CACHE_STATUS_OK == slot->cache()->CacheStatus()
     if (is_need_read_cache()) {
-      DoFromCache(slot);
+      PreDo(slot);
     }
-    if (is_read()) {
-      Do(slot);
+    if (is_read() && res().CacheMiss()) {
+      DoFromCache(slot);
       if (is_need_update_cache()) {
         DoUpdateCache(slot);
       }
     } else if (is_write()) {
-      Do(slot);
-      if (is_need_update_cache()) {
+      DoFromCache(slot);
+      if ( is_need_update_cache()) {
         DoUpdateCache(slot);
       }
     }
@@ -953,7 +953,6 @@ bool Cmd::is_admin_require() const { return ((flag_ & kCmdFlagsMaskAdminRequire)
 bool Cmd::is_single_slot() const { return ((flag_ & kCmdFlagsMaskSlot) == kCmdFlagsSingleSlot); }
 bool Cmd::is_multi_slot() const { return ((flag_ & kCmdFlagsMaskSlot) == kCmdFlagsMultiSlot); }
 bool Cmd::is_need_update_cache() const { return ((flag_ & kCmdFlagsMaskUpdateCache) == kCmdFlagsUpdateCache);  }
-bool Cmd::is_only_from_cache() const { return ((flag_ & kCmdFlagsMaskOnlyDoCache) == kCmdFlagsOnlyDoCache); }
 bool Cmd::need_cache_do() const {
   if (g_pika_conf->IsCacheDisabledTemporarily()) {
     return false;
