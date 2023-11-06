@@ -98,7 +98,7 @@ class ZIncrbyCmd : public Cmd {
   double Score() { return score_; }
 
  private:
-  std::string key_ , member_;
+  std::string key_, member_;
   double by_ = 0;
   double score_{};
   void DoInitial() override;

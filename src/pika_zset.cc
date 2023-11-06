@@ -1174,7 +1174,8 @@ void ZRangebylexCmd::PreDo(std::shared_ptr<Slot> slot) {
     FitLimit(count_, offset_, members.size());
 
     res_.AppendArrayLen(count_);
-    size_t index = offset_, end = offset_ + count_;
+    size_t index = offset_;
+    size_t end = offset_ + count_;
     for (; index < end; index++) {
       res_.AppendStringLen(members[index].size());
       res_.AppendContent(members[index]);
