@@ -98,7 +98,7 @@ class ZIncrbyCmd : public Cmd {
   double Score() { return score_; }
 
  private:
-  std::string key_, member_;
+  std::string key_ , member_;
   double by_ = 0;
   double score_{};
   void DoInitial() override;
@@ -110,7 +110,8 @@ class ZsetRangeParentCmd : public Cmd {
 
  protected:
   std::string key_;
-  int64_t start_ = 0, stop_ = -1;
+  int64_t start_ = 0;
+  int64_t stop_ = -1;
   bool is_ws_ = false;
   void DoInitial() override;
   void Clear() override { is_ws_ = false; }
@@ -248,7 +249,7 @@ class ZCountCmd : public Cmd {
 
  private:
   std::string key_;
-  std::string min_, max_;
+  std::string min_ , max;
   double min_score_ = 0, max_score_ = 0;
   bool left_close_ = true, right_close_ = true;
   rocksdb::Status s_;
@@ -277,7 +278,7 @@ class ZRemCmd : public Cmd {
  private:
   std::string key_;
   std::vector<std::string> members_;
-  int32_t deleted_;
+  int32_t deleted_ = 0;
   void DoInitial() override;
 };
 

@@ -51,6 +51,7 @@ void ZAddCmd::DoFromCache(std::shared_ptr<Slot> slot) {
 
 void ZAddCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
   if (s_.ok()) {
+    std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
     slot->cache()->ZAddIfKeyExist(key_, score_members);
   }
 }
@@ -181,8 +182,8 @@ void ZIncrbyCmd::DoFromCache(std::shared_ptr<Slot> slot) {
 }
 
 void ZIncrbyCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
-  std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
   if (s_.ok()) {
+    std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
     slot->cache()->ZIncrbyIfKeyExist(CachePrefixKeyZ, member_, by_, this);
   }
 }
@@ -277,8 +278,8 @@ void ZRangeCmd::DoFromCache(std::shared_ptr<Slot> slot) {
 }
 
 void ZRangeCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
-  std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
   if (s_.ok()) {
+    std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
     slot->cache()->PushKeyToAsyncLoadQueue(PIKA_KEY_TYPE_ZSET, CachePrefixKeyZ);
   }
 }
@@ -356,8 +357,8 @@ void ZRevrangeCmd::DoFromCache(std::shared_ptr<Slot> slot) {
 }
 
 void ZRevrangeCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
-  std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
   if (s_.ok()) {
+    std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
     slot->cache()->PushKeyToAsyncLoadQueue(PIKA_KEY_TYPE_ZSET, CachePrefixKeyZ);
   }
 }
@@ -518,8 +519,8 @@ void ZRangebyscoreCmd::DoFromCache(std::shared_ptr<Slot> slot) {
 }
 
 void ZRangebyscoreCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
-  std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
   if (s_.ok()) {
+    std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
     slot->cache()->PushKeyToAsyncLoadQueue(PIKA_KEY_TYPE_ZSET, CachePrefixKeyZ);
   }
 }
@@ -617,8 +618,8 @@ void ZRevrangebyscoreCmd::DoFromCache(std::shared_ptr<Slot> slot) {
 }
 
 void ZRevrangebyscoreCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
-  std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
   if (s_.ok()) {
+    std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
     slot->cache()->PushKeyToAsyncLoadQueue(PIKA_KEY_TYPE_ZSET, CachePrefixKeyZ);
   }
 }
@@ -674,8 +675,8 @@ void ZCountCmd::DoFromCache(std::shared_ptr<Slot> slot) {
 }
 
 void ZCountCmd::DoUpdateCache(std::shared_ptr<Slot> slot) {
-  std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
   if (s_.ok()) {
+    std::string CachePrefixKeyZ = PCacheKeyPrefixZ + key_;
     slot->cache()->PushKeyToAsyncLoadQueue(PIKA_KEY_TYPE_ZSET, CachePrefixKeyZ);
   }
 }
