@@ -1,4 +1,4 @@
-// Copyright (c) 2013-present, Qihoo, Inc.  All rights reserved.
+// Copyright (c) 2023-present, Qihoo, Inc.  All rights reserved.
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree. An additional grant
 // of patent rights can be found in the PATENTS file in the same directory.
@@ -106,13 +106,7 @@ void PikaCache::FlushSlot(void) {
   cache_->FlushDb();
 }
 
-void PikaCache::ActiveExpireCycle() {
-  std::unique_lock l(rwlock_);
-  cache_->ActiveExpireCycle();
-}
-
-Status PikaCache::Del(const std::vector<std::string> &keys)
-{
+Status PikaCache::Del(const std::vector<std::string> &keys) {
   std::unique_lock l(rwlock_);
   for (const auto &key : keys) {
     int cache_index = CacheIndex(key);
@@ -125,21 +119,21 @@ Status PikaCache::Expire(std::string &key, int64_t ttl) {
   std::unique_lock l(rwlock_);
   int cache_index = CacheIndex(key);
   std::lock_guard lm(*cache_mutexs_[cache_index]);
-  return cache_->Expire(key, ttl);
+  return caches_[cache_index]->Expire(key, ttl);
 }
 
 Status PikaCache::Expireat(std::string &key, int64_t ttl) {
   std::unique_lock l(rwlock_);
   int cache_index = CacheIndex(key);
   std::lock_guard lm(*cache_mutexs_[cache_index]);
-  return cache_->Expireat(key, ttl);
+  return caches_[cache_index]->Expireat(key, ttl);
 }
 
 Status PikaCache::TTL(std::string &key, int64_t *ttl) {
   std::unique_lock l(rwlock_);
   int cache_index = CacheIndex(key);
   std::lock_guard lm(*cache_mutexs_[cache_index]);
-  return cache_->TTL(key, ttl);
+  return caches_[cache_index]->TTL(key, ttl);
 }
 
 Status PikaCache::Persist(std::string &key) {
@@ -228,12 +222,39 @@ Status PikaCache::Get(std::string &key, std::string *value) {
   return caches_[cache_index]->Get(key, value);
 }
 
+Status PikaCache::MSet(const std::vector<storage::KeyValue> &kvs) {
+  std::unique_lock l(rwlock_);
+  for (const auto &item : kvs) {
+    auto [key, value] = item;
+    int cache_index = CacheIndex(key);
+    std::lock_guard lm(*cache_mutexs_[cache_index]);
+    return caches_[cache_index]->SetxxWithoutTTL(key, value);
+  }
+  return Status::OK();
+}
+
+Status PikaCache::MGet(const std::vector<std::string> &keys, std::vector<storage::ValueStatus> *vss) {
+  std::shared_lock l(rwlock_);
+  vss->resize(keys.size());
+  auto ret = Status::OK();
+  for (int i = 0; i < keys.size(); ++i) {
+    int cache_index = CacheIndex(keys[i]);
+    std::lock_guard lm(*cache_mutexs_[cache_index]);
+    auto s = caches_[cache_index]->Get(keys[i], &(*vss)[i].value);
+    (*vss)[i].status = s;
+    if (!s.ok()) {
+      ret = s;
+    }
+  }
+  return ret;
+}
+
 Status PikaCache::Incrxx(std::string &key) {
   std::unique_lock l(rwlock_);
   int cache_index = CacheIndex(key);
   std::lock_guard lm(*cache_mutexs_[cache_index]);
-  if (cache_->Exists(key)) {
-    return cache_->Incr(key);
+  if (caches_[cache_index]->Exists(key)) {
+    return caches_[cache_index]->Incr(key);
   }
   return Status::NotFound("key not exist");
 }

@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "include/pika_server.h"
-#include "pika_define.h"
-#include "pika_zset.h"
+#include "include/pika_define.h"
+#include "include/pika_zset.h"
 #include "pstd/include/pstd_mutex.h"
 #include "pstd/include/pstd_status.h"
 #include "cache/include/cache.h"
@@ -221,13 +221,13 @@ class PikaCache : public pstd::noncopyable, public std::enable_shared_from_this<
  private:
   std::atomic<int> cache_status_;
   std::unique_ptr<cache::RedisCache> cache_;
-  uint32_t cache_num_;
+  uint32_t cache_num_ = 0;
 
   // currently only take effects to zset
-  int cache_start_pos_;
-  int cache_items_per_key_;
+  int cache_start_pos_ = 0;
+  int cache_items_per_key_ = 0;
   std::shared_mutex rwlock_;
-  PikaCacheLoadThread *cache_load_thread_;  // 这个线程保留
+  PikaCacheLoadThread *cache_load_thread_;
   std::shared_ptr<Slot> slot_;
   std::vector<cache::RedisCache*> caches_;
   std::vector<pstd::Mutex*> cache_mutexs_;

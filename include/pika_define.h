@@ -413,13 +413,6 @@ const std::string PCacheKeyPrefixZ = "Z";
 const std::string PCacheKeyPrefixL = "L";
 const std::string PCacheKeyPrefixB = "B";
 
-/*
- * cache task type
- */
-const int CACHE_BGTASK_CLEAR  =  0;
-const int CACHE_BGTASK_RESET_NUM = 1;
-const int CACHE_BGTASK_RESET_CFG = 2;
-
 
 /*
  * cache status
@@ -440,5 +433,15 @@ const char PIKA_KEY_TYPE_HASH = 'h';
 const char PIKA_KEY_TYPE_LIST = 'l';
 const char PIKA_KEY_TYPE_SET = 's';
 const char PIKA_KEY_TYPE_ZSET = 'z';
+
+
+/*
+ * cache task type
+ */
+enum CacheBgTask {
+  CACHE_BGTASK_CLEAR = 0,
+  CACHE_BGTASK_RESET_NUM = 1,
+  CACHE_BGTASK_RESET_CFG = 2
+};
 
 #endif
