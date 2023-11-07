@@ -74,6 +74,11 @@ void PikaCache::ProcessCronTask(void) {
   }
 }
 
+void PikaCache::ActiveExpireCycle() {
+  std::unique_lock l(rwlock_);
+  cache_->ActiveExpireCycle();
+}
+
 void PikaCache::SetCacheStatus(int status) { cache_status_ = status; }
 
 int PikaCache::CacheStatus(void) { return cache_status_; }
