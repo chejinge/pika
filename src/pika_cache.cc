@@ -26,7 +26,7 @@ PikaCache::PikaCache(int cache_start_pos, int cache_items_per_key, std::shared_p
       cache_items_per_key_(EXTEND_CACHE_SIZE(cache_items_per_key)),
       slot_(slot) {
   cache_ = std::make_unique<cache::RedisCache>();
-  cache_load_thread_ = std::make_shared<PikaCacheLoadThread> (cache_start_pos_, cache_items_per_key_);
+  cache_load_thread_ = std::make_unique<PikaCacheLoadThread> (cache_start_pos_, cache_items_per_key_);
   cache_load_thread_->StartThread();
 }
 
@@ -1633,7 +1633,7 @@ Status PikaCache::InitWithoutLock(uint32_t cache_num, cache::CacheConfig *cache_
       return Status::Corruption("create redis cache failed");
     }
     caches_.push_back(cache);
-    cache_mutexs_.push_back(new std::mutex);
+    cache_mutexs_.push_back(std::make_shared<pstd::Mutex>());
   }
   cache_status_ = PIKA_CACHE_STATUS_OK;
 
@@ -1648,10 +1648,6 @@ void PikaCache::DestroyWithoutLock(void)
     delete *iter;
   }
   caches_.clear();
-
-  for (auto iter = cache_mutexs_.begin(); iter != cache_mutexs_.end(); ++iter) {
-    delete *iter;
-  }
   cache_mutexs_.clear();
 }
 

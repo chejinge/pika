@@ -227,10 +227,10 @@ class PikaCache : public pstd::noncopyable, public std::enable_shared_from_this<
   int cache_start_pos_ = 0;
   int cache_items_per_key_ = 0;
   std::shared_mutex rwlock_;
-  shared_ptr<PikaCacheLoadThread> cache_load_thread_;
+  std::unique_ptr<PikaCacheLoadThread> cache_load_thread_;
   std::shared_ptr<Slot> slot_;
   std::vector<cache::RedisCache*> caches_;
-  std::vector<pstd::Mutex*> cache_mutexs_;
+  std::vector<std::shared_ptr<pstd::Mutex>> cache_mutexs_;
 };
 
 #endif
