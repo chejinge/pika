@@ -26,8 +26,10 @@ void PikaCacheManager::Init(const std::map<std::string, std::shared_ptr<DB>>& db
 }
 
 void PikaCacheManager::ProcessCronTask() {
-  for (auto& cache : caches_) {
-    cache.second->ActiveExpireCycle();
+  auto slot = g_pika_server->GetSlotByDBName(g_pika_conf->default_db());
+  auto caches = slot->cache()->GetCaches();
+  for (uint32_t i = 0; i < caches.size(); ++i) {
+    caches[i]->ActiveExpireCycle();
   }
   LOG(INFO) << "hit rate:" << HitRatio() << std::endl;
 }

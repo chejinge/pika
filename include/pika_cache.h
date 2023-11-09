@@ -199,6 +199,7 @@ class PikaCache : public pstd::noncopyable, public std::enable_shared_from_this<
   rocksdb::Status CacheZCard(std::string &key, uint64_t *len);
 
   std::shared_ptr<Slot> GetSlot() { return slot_; }
+  std::vector<cache::RedisCache*> GetCaches() { return caches_;}
  private:
 
   rocksdb::Status InitWithoutLock(uint32_t cache_num, cache::CacheConfig *cache_cfg);
