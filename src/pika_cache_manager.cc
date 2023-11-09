@@ -25,27 +25,6 @@ void PikaCacheManager::Init(const std::map<std::string, std::shared_ptr<DB>>& db
   }
 }
 
-void PikaCacheManager::ProcessCronTask() {
-  auto slot = g_pika_server->GetSlotByDBName(g_pika_conf->default_db());
-  auto caches = slot->cache()->GetCaches();
-  for (uint32_t i = 0; i < caches.size(); ++i) {
-    caches[i]->ActiveExpireCycle();
-  }
-  LOG(INFO) << "hit rate:" << HitRatio() << std::endl;
-}
-
-double PikaCacheManager::HitRatio(void) {
-  std::unique_lock l(mu_);
-  int64_t hits = 0;
-  int64_t misses = 0;
-  cache::RedisCache::GetHitAndMissNum(&hits, &misses);
-  int64_t all_cmds = hits + misses;
-  if (0 >= all_cmds) {
-    return 0;
-  }
-  return hits / (all_cmds * 1.0);
-}
-
 void PikaCacheManager::ClearHitRatio(void) {
   std::unique_lock l(mu_);
   cache::RedisCache::ResetHitAndMissNum();
