@@ -3,8 +3,8 @@
 // LICENSE file in the root directory of this source tree. An additional grant
 // of patent rights can be found in the PATENTS file in the same directory.
 
-#ifndef PIKA_PIKA_CACHE_H
-#define PIKA_PIKA_CACHE_H
+#ifndef PIKA_CACHE_H
+#define PIKA_CACHE_H
 
 #include <atomic>
 #include <sstream>
@@ -227,7 +227,7 @@ class PikaCache : public pstd::noncopyable, public std::enable_shared_from_this<
   int cache_start_pos_ = 0;
   int cache_items_per_key_ = 0;
   std::shared_mutex rwlock_;
-  PikaCacheLoadThread *cache_load_thread_;
+  shared_ptr<PikaCacheLoadThread> cache_load_thread_;
   std::shared_ptr<Slot> slot_;
   std::vector<cache::RedisCache*> caches_;
   std::vector<pstd::Mutex*> cache_mutexs_;

@@ -26,7 +26,7 @@ PikaCache::PikaCache(int cache_start_pos, int cache_items_per_key, std::shared_p
       cache_items_per_key_(EXTEND_CACHE_SIZE(cache_items_per_key)),
       slot_(slot) {
   cache_ = std::make_unique<cache::RedisCache>();
-  cache_load_thread_ = new PikaCacheLoadThread(cache_start_pos_, cache_items_per_key_, slot);
+  cache_load_thread_ = std::make_shared<PikaCacheLoadThread> (cache_start_pos_, cache_items_per_key_);
   cache_load_thread_->StartThread();
 }
 
@@ -103,12 +103,17 @@ void PikaCache::Info(CacheInfo &info) {
 
 bool PikaCache::Exists(std::string &key) {
   std::shared_lock l(rwlock_);
-  return cache_->Exists(key);
+  int cache_index = CacheIndex(key);
+  std::lock_guard lm(*cache_mutexs_[cache_index]);
+  return caches_[cache_index]->Exists(key);
 }
 
 void PikaCache::FlushSlot(void) {
   std::unique_lock l(rwlock_);
-  cache_->FlushDb();
+  for (uint32_t i = 0; i < caches_.size(); ++i) {
+    std::lock_guard lm(*cache_mutexs_[i]);
+    caches_[i]->FlushDb();
+  }
 }
 
 Status PikaCache::Del(const std::vector<std::string> &keys) {
@@ -790,10 +795,10 @@ bool PikaCache::GetCacheMinMaxSM(cache::RedisCache *cache_obj, std::string &key,
 }
 
 Status PikaCache::ZAddIfKeyExist(std::string &key, std::vector<storage::ScoreMember> &score_members) {
-  // 看下为什么需要使用unique，如果没有必须要求，没必要使用unique
   std::unique_lock l(rwlock_);
-
-  auto cache_obj = cache_.get();
+  int cache_index = CacheIndex(key);
+  std::lock_guard lm(*cache_mutexs_[cache_index]);
+  auto cache_obj = caches_[cache_index];
   Status s;
   if (cache_obj->Exists(key)) {
     std::unordered_set<std::string> unique;
@@ -893,11 +898,9 @@ Status PikaCache::CleanCacheKeyIfNeeded(cache::RedisCache *cache_obj, std::strin
     long start = 0;
     long stop = 0;
     if (cache_start_pos_ == cache::CACHE_START_FROM_BEGIN) {
-      // 淘汰尾部
       start = -cache_len + cache_items_per_key_;
       stop = -1;
     } else if (cache_start_pos_ == cache::CACHE_START_FROM_END) {
-      // 淘汰头部
       start = 0;
       stop = cache_len - cache_items_per_key_ - 1;
     }
@@ -1177,9 +1180,8 @@ RangeStatus PikaCache::CheckCacheRange(int32_t cache_len, int32_t db_len, int64_
 
 RangeStatus PikaCache::CheckCacheRevRange(int32_t cache_len, int32_t db_len, int64_t start, int64_t stop, int64_t &out_start,
                                           int64_t &out_stop) {
-  // db 正向的index
-  long start_index = stop >= 0 ? db_len - stop - 1 : -stop - 1;
-  long stop_index = start >= 0 ? db_len - start - 1 : -start - 1;
+  int64_t start_index = stop >= 0 ? db_len - stop - 1 : -stop - 1;
+  int64_t stop_index = start >= 0 ? db_len - start - 1 : -start - 1;
   start_index = start_index <= 0 ? 0 : start_index;
   stop_index = stop_index >= db_len ? db_len - 1 : stop_index;
   if (start_index > stop_index || start_index >= db_len || stop_index < 0) {
@@ -1197,10 +1199,8 @@ RangeStatus PikaCache::CheckCacheRevRange(int32_t cache_len, int32_t db_len, int
       }
     } else if (cache_start_pos_ == cache::CACHE_START_FROM_END) {
       if (start_index >= db_len - cache_len && stop_index >= db_len - cache_len) {
-        // cache 正向的index
         int cache_start = start_index - (db_len - cache_len);
         int cache_stop = stop_index - (db_len - cache_len);
-        // cache 逆向的index
         out_start = cache_len - cache_stop - 1;
         out_stop = cache_len - cache_start - 1;
         return RangeStatus::RangeHit;
@@ -1619,7 +1619,7 @@ Status PikaCache::InitWithoutLock(uint32_t cache_num, cache::CacheConfig *cache_
   cache_status_ = PIKA_CACHE_STATUS_INIT;
 
   cache_num_ = cache_num;
-  if (nullptr != cache_cfg) {
+  if (cache_cfg != nullptr) {
     cache::RedisCache::SetConfig(cache_cfg);
   }
 
@@ -1661,8 +1661,8 @@ int PikaCache::CacheIndex(const std::string &key) {
 }
 
 Status PikaCache::WriteKvToCache(std::string &key, std::string &value, int64_t ttl) {
-  if (0 >= ttl) {
-    if (PIKA_TTL_NONE == ttl) {
+  if (ttl <= 0) {
+    if (ttl == PIKA_TTL_NONE) {
       return SetnxWithoutTTL(key, value);
     } else {
       return Del({key});
@@ -1674,8 +1674,8 @@ Status PikaCache::WriteKvToCache(std::string &key, std::string &value, int64_t t
 }
 
 Status PikaCache::WriteHashToCache(std::string &key, std::vector<storage::FieldValue> &fvs, int64_t ttl) {
-  if (0 >= ttl) {
-    if (PIKA_TTL_NONE == ttl) {
+  if (ttl <= 0) {
+    if (ttl == PIKA_TTL_NONE) {
       return HMSetnxWithoutTTL(key, fvs);
     } else {
       return Del({key});
@@ -1687,8 +1687,8 @@ Status PikaCache::WriteHashToCache(std::string &key, std::vector<storage::FieldV
 }
 
 Status PikaCache::WriteListToCache(std::string &key, std::vector<std::string> &values, int64_t ttl) {
-  if (0 >= ttl) {
-    if (PIKA_TTL_NONE == ttl) {
+  if (ttl <= 0) {
+    if (ttl == PIKA_TTL_NONE) {
       return RPushnxWithoutTTL(key, values);
     } else {
       return Del({key});
@@ -1700,8 +1700,8 @@ Status PikaCache::WriteListToCache(std::string &key, std::vector<std::string> &v
 }
 
 Status PikaCache::WriteSetToCache(std::string &key, std::vector<std::string> &members, int64_t ttl) {
-  if (0 >= ttl) {
-    if (PIKA_TTL_NONE == ttl) {
+  if (ttl <= 0) {
+    if (ttl == PIKA_TTL_NONE) {
       return SAddnxWithoutTTL(key, members);
     } else {
       return Del({key});
@@ -1713,8 +1713,8 @@ Status PikaCache::WriteSetToCache(std::string &key, std::vector<std::string> &me
 }
 
 Status PikaCache::WriteZSetToCache(std::string &key, std::vector<storage::ScoreMember> &score_members, int64_t ttl) {
-  if (0 >= ttl) {
-    if (PIKA_TTL_NONE == ttl) {
+  if (ttl <= 0) {
+    if (ttl == PIKA_TTL_NONE) {
       return ZAddnxWithoutTTL(key, score_members);
     } else {
       return Del({key});
