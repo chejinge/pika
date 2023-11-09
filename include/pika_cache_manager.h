@@ -63,7 +63,7 @@ class PikaCacheManager : public pstd::noncopyable {
   std::shared_mutex mu_;
   std::unordered_map<std::string, std::shared_ptr<PikaCache>> caches_;
   std::atomic<int> cache_status_;
-  std::unique_ptr<PikaCacheLoadThread> cache_load_thread_;
+  PikaCacheLoadThread *cache_load_thread_;
   DisplayCacheInfo cache_info_;
   std::shared_mutex cache_info_rwlock_;
 };
