@@ -7,8 +7,6 @@
 
 #include "pstd_defer.h"
 
-#include "glog/logging.h"
-
 namespace cache {
 
 Status RedisCache::SetBit(std::string &key, size_t offset, int64_t value) {
