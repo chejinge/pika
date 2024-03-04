@@ -48,17 +48,17 @@ class PikaMigrate {
   void Unlock() {
     mutex_.unlock();
   }
-  net::NetCli* GetMigrateClient(const std::string& host, const int port, int timeout);
+  std::unique_ptr<net::NetCli> GetMigrateClient(const std::string& host, const int port, int timeout);
 
  private:
   std::map<std::string, void*> migrate_clients_;
   pstd::Mutex mutex_;
-  void KillMigrateClient(net::NetCli* migrate_cli);
+  void KillMigrateClient(std::unique_ptr<net::NetCli> migrate_cli);
   void KillAllMigrateClient();
   int64_t TTLByType(const char key_type, const std::string& key, const std::shared_ptr<DB>& db);
-  int MigrateSend(net::NetCli* migrate_cli, const std::string& key, const char type, std::string& detail,
+  int MigrateSend(std::unique_ptr<net::NetCli> migrate_cli, const std::string& key, const char type, std::string& detail,
                   const std::shared_ptr<DB>& db);
-  bool MigrateRecv(net::NetCli* migrate_cli, int need_receive, std::string& detail);
+  bool MigrateRecv(std::unique_ptr<net::NetCli> migrate_cli, int need_receive, std::string& detail);
   int ParseKey(const std::string& key, const char type, std::string& wbuf_str, const std::shared_ptr<DB>& db);
   int ParseKKey(const std::string& key, std::string& wbuf_str, const std::shared_ptr<DB>& db);
   int ParseZKey(const std::string& key, std::string& wbuf_str, const std::shared_ptr<DB>& db);
@@ -275,6 +275,26 @@ class SlotsCleanupOffCmd : public Cmd {
 
  private:
   void DoInitial() override;
+};
+
+////slotsrestore key ttl(ms) value(rdb)
+struct RestoreKey {
+  std::string key;
+  int64_t ttlms;
+  std::string value;
+};
+
+class SlotsrestoreCmd : public Cmd {
+ public:
+  SlotsrestoreCmd(const std::string& name, int arity, uint32_t flag) : Cmd(name, arity, flag) {}
+  void Do() override;
+  void Split(const HintKeys& hint_keys) override {};
+  void Merge() override {};
+  Cmd* Clone() override { return new SlotsrestoreCmd(*this); }
+
+ private:
+  void DoInitial() override;
+  std::vector<struct RestoreKey> restore_keys_;
 };
 
 #endif

@@ -21,6 +21,7 @@
 #include "include/pika_admin.h"
 #include "include/pika_cmd_table_manager.h"
 #include "include/pika_rm.h"
+#include "utils/pika_redis.h"
 
 #define min(a, b) (((a) > (b)) ? (b) : (a))
 #define MAX_MEMBERS_NUM 512
@@ -68,28 +69,26 @@ PikaMigrate::~PikaMigrate() {
   KillAllMigrateClient();
 }
 
-net::NetCli *PikaMigrate::GetMigrateClient(const std::string &host, const int port, int timeout) {
+std::unique_ptr<net::NetCli> PikaMigrate::GetMigrateClient(const std::string &host, const int port, int timeout) {
   std::string ip_port = host + ":" + std::to_string(port);
-  net::NetCli *migrate_cli;
+  std::unique_ptr<net::NetCli> migrate_cli;
   pstd::Status s;
 
   auto migrate_clients_iter = migrate_clients_.find(ip_port);
   if (migrate_clients_iter == migrate_clients_.end()) {
-    migrate_cli = net::NewRedisCli();
+    //migrate_cli = net::NewRedisCli();
     s = migrate_cli->Connect(host, port, g_pika_server->host());
     if (!s.ok()) {
       LOG(ERROR) << "GetMigrateClient: new  migrate_cli[" << ip_port.c_str() << "] failed";
-
-      delete migrate_cli;
       return nullptr;
     }
 
-    LOG(INFO) << "GetMigrateClient: new  migrate_cli[" << ip_port.c_str() << "]";
+    LOG(INFO) << "GetMigrateClient: new migrate_cli[" << ip_port.c_str() << "]";
 
     // add a new migrate client to the map
-    migrate_clients_[ip_port] = migrate_cli;
+    migrate_clients_[ip_port] = &migrate_cli;
   } else {
-    migrate_cli = static_cast<net::NetCli *>(migrate_clients_iter->second);
+    //migrate_cli = migrate_clients_iter->second;
   }
 
   // set the client connect timeout
@@ -102,21 +101,14 @@ net::NetCli *PikaMigrate::GetMigrateClient(const std::string &host, const int po
   return migrate_cli;
 }
 
-void PikaMigrate::KillMigrateClient(net::NetCli *migrate_cli) {
-  auto migrate_clients_iter = migrate_clients_.begin();
-  while (migrate_clients_iter != migrate_clients_.end()) {
-    if (migrate_cli == static_cast<net::NetCli *>(migrate_clients_iter->second)) {
+void PikaMigrate::KillMigrateClient(std::unique_ptr<net::NetCli> migrate_cli) {
+  for(auto migrate_clients_iter = migrate_clients_.begin();
+ migrate_clients_iter != migrate_clients_.end(); ++migrate_clients_iter) {
+    if (migrate_cli.get() == migrate_clients_iter->second) {
       LOG(INFO) << "KillMigrateClient: kill  migrate_cli[" << migrate_clients_iter->first.c_str() << "]";
-
-      migrate_cli->Close();
-      delete migrate_cli;
-      migrate_cli = nullptr;
-
       migrate_clients_.erase(migrate_clients_iter);
       break;
     }
-
-    ++migrate_clients_iter;
   }
 }
 
@@ -173,26 +165,26 @@ int PikaMigrate::MigrateKey(const std::string &host, const int port, int timeout
                             const char type, std::string &detail, const std::shared_ptr<DB>& db) {
   int send_command_num = -1;
 
-  net::NetCli *migrate_cli = GetMigrateClient(host, port, timeout);
+  std::unique_ptr<net::NetCli> migrate_cli = GetMigrateClient(host, port, timeout);
   if (!migrate_cli) {
     detail = "IOERR error or timeout connecting to the client";
     LOG(INFO) << "GetMigrateClient failed, key: " << key;
     return -1;
   }
 
-  send_command_num = MigrateSend(migrate_cli, key, type, detail, db);
+  send_command_num = MigrateSend(std::move(migrate_cli), key, type, detail, db);
   if (send_command_num <= 0) {
     return send_command_num;
   }
 
-  if (MigrateRecv(migrate_cli, send_command_num, detail)) {
+  if (MigrateRecv(std::move(migrate_cli), send_command_num, detail)) {
     return send_command_num;
   }
 
   return -1;
 }
 
-int PikaMigrate::MigrateSend(net::NetCli* migrate_cli, const std::string& key, const char type, std::string& detail,
+int PikaMigrate::MigrateSend(std::unique_ptr<net::NetCli> migrate_cli, const std::string& key, const char type, std::string& detail,
                              const std::shared_ptr<DB>& db) {
   std::string wbuf_str;
   pstd::Status s;
@@ -218,14 +210,14 @@ int PikaMigrate::MigrateSend(net::NetCli* migrate_cli, const std::string& key, c
   if (!s.ok()) {
     LOG(ERROR) << "Connect slots target, Send error: " << s.ToString();
     detail = "Connect slots target, Send error: " + s.ToString();
-    KillMigrateClient(migrate_cli);
+    KillMigrateClient(std::move(migrate_cli));
     return -1;
   }
 
   return command_num;
 }
 
-bool PikaMigrate::MigrateRecv(net::NetCli* migrate_cli, int need_receive, std::string& detail) {
+bool PikaMigrate::MigrateRecv(std::unique_ptr<net::NetCli> migrate_cli, int need_receive, std::string& detail) {
   pstd::Status s;
   std::string reply;
   int64_t ret;
@@ -240,7 +232,7 @@ bool PikaMigrate::MigrateRecv(net::NetCli* migrate_cli, int need_receive, std::s
     if (!s.ok()) {
       LOG(ERROR) << "Connect slots target, Recv error: " << s.ToString();
       detail = "Connect slots target, Recv error: " + s.ToString();
-      KillMigrateClient(migrate_cli);
+      KillMigrateClient(std::move(migrate_cli));
       return false;
     }
 
@@ -1603,6 +1595,223 @@ void SlotsCleanupOffCmd::DoInitial() {
 
 void SlotsCleanupOffCmd::Do() {
   g_pika_server->StopBgslotscleanup();
+  res_.SetRes(CmdRes::kOk);
+  return;
+}
+
+static rocksdb::Status RestoreKV(const std::string &key, const restore_value &dbvalue, std::shared_ptr<DB> db) {
+  if(dbvalue.type != storage::kStrings){
+    return rocksdb::Status::Corruption("dbvalue format error");
+  }
+
+  rocksdb::Status s;
+  s = db->storage()->Set(key, dbvalue.kvv);
+  if (!s.ok()) {
+    return s;
+  }
+
+  AddSlotKey("k", key, db);
+
+  return s;
+}
+
+static rocksdb::Status RestoreList(const std::string &key, const restore_value &dbvalue, std::shared_ptr<DB> db) {
+  if(dbvalue.type != storage::kLists){
+    return rocksdb::Status::Corruption("dbvalue format error");
+  }
+
+  uint64_t llen = 0;
+  rocksdb::Status s;
+
+  //std::vector<std::string>::const_iterator iter = dbvalue.listv.begin();
+  s = db->storage()->RPush(key, dbvalue.listv, &llen);
+  if (!s.ok()) {
+    return s;
+  }
+
+  AddSlotKey("l", key, db);
+
+  return s;
+}
+
+static rocksdb::Status RestoreSet(const std::string &key, const restore_value &dbvalue, std::shared_ptr<DB> db) {
+  if(dbvalue.type != storage::kSets){
+    return rocksdb::Status::Corruption("dbvalue format error");
+  }
+
+  int32_t res = 0;
+  rocksdb::Status s;
+  s = db->storage()->SAdd(key, dbvalue.setv, &res);
+  if (!s.ok()) {
+    return s;
+  }
+
+  AddSlotKey("s", key, db);
+
+  return s;
+}
+
+static rocksdb::Status RestoreZset(const std::string &key, const restore_value &dbvalue, std::shared_ptr<DB> db) {
+  if(dbvalue.type != storage::kZSets){
+    return rocksdb::Status::Corruption("dbvalue format error");
+  }
+
+  int32_t res = 0;
+  rocksdb::Status s;
+
+
+  s = db->storage()->ZAdd(key, dbvalue.zsetv, &res);;
+  if (!s.ok()) {
+    return s;
+  }
+
+  AddSlotKey("z", key, db);
+
+  return s;
+}
+
+static rocksdb::Status RestoreHash(const std::string &key, const restore_value &dbvalue, std::shared_ptr<DB> db) {
+  if(dbvalue.type != storage::kHashes){
+    return rocksdb::Status::Corruption("dbvalue format error");
+  }
+
+  int32_t ret = 0;
+  rocksdb::Status s;
+
+  std::vector<storage::FieldValue>::const_iterator iter = dbvalue.hashv.begin();
+  for (; iter != dbvalue.hashv.end(); iter++) {
+    s = db->storage()->HSet(key, iter->field, iter->value, &ret);
+    if (!s.ok()) {
+      return s;
+    }
+  }
+  AddSlotKey("h", key, db);
+
+  return s;
+}
+
+/* *
+ * slotsrestore key ttlms value
+ * ttlms is 0 or >=1, 0 indicates no expire
+ * */
+void SlotsrestoreCmd::DoInitial() {
+  if (!CheckArg(argv_.size()) || (argv_.size() - 1) % 3 != 0) {
+    res_.SetRes(CmdRes::kWrongNum, kCmdNameSlotsrestore);
+    return;
+  }
+
+  restore_keys_.clear();
+
+  size_t index = 1;
+  int64_t ttlms;
+
+  for (; index < argv_.size(); index += 3){
+    if (!pstd::string2int(argv_[index+1].data(), argv_[index+1].size(), &ttlms)) {
+      res_.SetRes(CmdRes::kInvalidInt);
+      return;
+    }
+
+    if (ttlms < 0){
+      res_.SetRes(CmdRes::kErrOther, "invalid ttl value, ttl must be >= 0");
+      return;
+    }
+
+    restore_keys_.push_back({argv_[index], ttlms, argv_[index+2]});
+  }
+}
+
+void SlotsrestoreCmd::Do() {
+  rocksdb::Status s;
+  std::vector<struct RestoreKey>::const_iterator iter = restore_keys_.begin();
+  for (; iter != restore_keys_.end(); iter++) {
+
+    if (verifyDumpPayload((unsigned char *)iter->value.data(), iter->value.size()) != REDIS_OK) {
+      std::string detail = "dump payload version or checksum are wrong";
+      LOG(ERROR) << detail;
+      res_.SetRes(CmdRes::kErrOther, detail);
+      return;
+    }
+
+    rio payload;
+    int rdbtype;
+    restore_value dbvalue;
+    rioInitWithBuffer(&payload, iter->value.data(), iter->value.size());
+
+    //check the type of rdb, and parse rdb
+    if ((rdbtype = rdbLoadObjectType(&payload)) == -1) {
+      std::string detail = "load object type failed";
+      LOG(ERROR) << detail;
+      res_.SetRes(CmdRes::kErrOther, detail);
+      return;
+    }
+    // not support quicklist, just skip
+    if (rdbtype == REDIS_RDB_TYPE_LIST_QUICKLIST) {
+      res_.SetRes(CmdRes::kOk);
+      return;
+    }
+    if (rdbLoadObject(rdbtype, &payload, &dbvalue) != REDIS_OK) {
+      std::string detail = "bad slotsrestore rdb format";
+      LOG(ERROR) << detail;
+      res_.SetRes(CmdRes::kErrOther, detail);
+      return;
+    }
+    switch (dbvalue.type){
+      case storage::kStrings :
+        s = RestoreKV(iter->key, dbvalue, db_);
+        break;
+      case storage::kLists :
+      {
+        //del old key, prevent last migrate failed
+        int64_t count = 0;
+        std::vector<std::string> keys;
+        std::map<storage::DataType, storage::Status> type_status;
+        keys.push_back(iter->key);
+        count = db_->storage()->Del(keys, &type_status);
+        if (count < 0) {
+          res_.SetRes(CmdRes::kErrOther, "delete error");
+          return;
+        }
+
+        s = RestoreList(iter->key, dbvalue, db_);
+      }
+      break;
+      case storage::kSets :
+        s = RestoreSet(iter->key, dbvalue, db_);
+        break;
+      case storage::kZSets :
+        s = RestoreZset(iter->key, dbvalue, db_);
+        break;
+      case storage::kHashes :
+        s = RestoreHash(iter->key, dbvalue, db_);
+        break;
+      default:
+        std::string detail = "error db type";
+        res_.SetRes(CmdRes::kErrOther, detail);
+        return;
+    }
+
+    if (!s.ok()) {
+      res_.SetRes(CmdRes::kErrOther, s.ToString());
+      return;
+    }
+
+    //set ttl, ttlms is 0 or >=1, 0 indicates no expire
+    if (iter->ttlms > 0){
+      std::map<storage::DataType, rocksdb::Status> type_status;
+      int32_t ret = db_->storage()->Expire(iter->key, iter->ttlms/1000, &type_status);
+      if (ret == -1) {
+        std::string detail = "expire exec failed";
+        res_.SetRes(CmdRes::kErrOther, detail);
+        return;
+      }
+
+    }
+
+    //write binlog
+    //del key and add key, or send restore command
+    WriteDelKeyToBinlog(iter->key, db_);
+  }
+
   res_.SetRes(CmdRes::kOk);
   return;
 }

@@ -125,7 +125,7 @@ struct ScoreMember {
 
 enum BeforeOrAfter { Before, After };
 
-enum DataType { kAll, kStrings, kHashes, kLists, kZSets, kSets, kStreams };
+enum DataType { kAll, kStrings, kHashes, kLists, kZSets, kSets, kStreams, kNONE_DB };
 
 const char DataTypeTag[] = {'a', 'k', 'h', 'l', 'z', 's', 'x'};
 
