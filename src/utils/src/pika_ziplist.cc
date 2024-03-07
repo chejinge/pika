@@ -73,14 +73,14 @@
  * ----------------------------------------------------------------------------
  */
 
+#include "utils/include/pika_ziplist.h"
+#include <assert.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
-#include <limits.h>
-#include <assert.h>
-#include "storage//util.h"
-#include "pika_ziplist.h"
+#include <cstddef>
 #include "pstd/include/pstd_string.h"
 
 #define ZIP_END 255

@@ -4,14 +4,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 //#include <stdint.h>
+#include <arpa/inet.h>
+#include <inttypes.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <inttypes.h>
-#include <arpa/inet.h>
-#include "storage/include/storage/storage.h"
-#include "pika_lzf.h"
 #include "pika_ziplist.h"
+#include "utils/include/pika_lzf.h"
+#include "storage/include/storage/storage.h"
 
 /* Error codes */
 #define REDIS_OK                0

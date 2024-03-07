@@ -731,6 +731,7 @@ add_subdirectory(src/pstd)
 add_subdirectory(src/net)
 add_subdirectory(src/storage)
 add_subdirectory(src/cache)
+add_subdirectory(src/utils)
 if (USE_PIKA_TOOLS)
   add_subdirectory(tools)
 endif()
@@ -767,8 +768,8 @@ message("pika BUILD_DATE = ${PIKA_BUILD_DATE}")
 
 set(PIKA_BUILD_VERSION_CC ${CMAKE_BINARY_DIR}/pika_build_version.cc
         src/pika_cache_load_thread.cc
-        src/utils/pika_lzf.cc
-        src/utils/pika_redis.cc
+        src/utils/src/pika_lzf.cc
+        src/utils/src/pika_redis.cc
 )
 message("PIKA_BUILD_VERSION_CC : " ${PIKA_BUILD_VERSION_CC})
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/build_version.cc.in ${PIKA_BUILD_VERSION_CC} @ONLY)
@@ -807,6 +808,7 @@ add_dependencies(${PROJECT_NAME}
   rediscache
   storage
   cache
+  utils
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -820,6 +822,7 @@ target_link_libraries(${PROJECT_NAME}
   storage
   net
   pstd
+  utils
   ${GLOG_LIBRARY}
   librocksdb.a
   ${LIB_PROTOBUF}

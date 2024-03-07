@@ -16,6 +16,6 @@ unsigned char *ziplistDeleteRange(unsigned char *zl, unsigned int index, unsigne
 unsigned int ziplistCompare(unsigned char *p, unsigned char *s, unsigned int slen);
 unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int vlen, unsigned int skip);
 unsigned int ziplistLen(unsigned char *zl);
-size_t ziplistBlobLen(unsigned char *zl);
+//size_t ziplistBlobLen(unsigned char *zl);
 
 #endif

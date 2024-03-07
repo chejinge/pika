@@ -1,6 +1,5 @@
-#include "pika_redis.h"
-#include <glog/logging.h>
-#include "storage/storage.h"
+#include "utils/include/pika_redis.h"
+#include "glog/logging.h"
 
 static const uint64_t crc64_tab[256] = {
     UINT64_C(0x0000000000000000), UINT64_C(0x7ad870c830358979),
