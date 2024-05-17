@@ -84,11 +84,13 @@ resources:
 persistence:
   enabled: false
   pikaData:
-    storageClassName:
+    storageClassName: local-storage
     size: 50Gi
+    volumeMode: Filesystem
   etcdData:
-    storageClassName:
+    storageClassName: local-storage
     size: 50Gi
+    volumeMode: Filesystem
 
 topologyKeys:
   - kubernetes.io/hostname
