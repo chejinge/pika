@@ -47,7 +47,7 @@ spec:
           - name: pika-script
       podSpec:
         nodeSelector:
-          group: pika
+          group: vpc_default
         {{- if .Values.imagePullSecrets }}
         imagePullSecrets:
         {{- range .Values.imagePullSecrets }}
@@ -116,7 +116,7 @@ spec:
       configSpecs:
       podSpec:
         nodeSelector:
-          group: pika
+          group: vpc_default
         initContainers:
           - name: volume-permissions
             image: busybox:1.28
@@ -227,7 +227,7 @@ spec:
           volumeName: config
       podSpec:
         nodeSelector:
-          group: pika
+          group: vpc_default
         initContainers:
           - name: wait-codis-dashboard
             env:
@@ -275,7 +275,7 @@ spec:
           volumeName: config
       podSpec:
         nodeSelector:
-          group: pika
+          group: vpc_default
         initContainers:
           - name: wait-etcd
             env:
@@ -348,7 +348,7 @@ spec:
             port: 8080
       podSpec:
         nodeSelector:
-          group: pika
+          group: vpc_default
         initContainers:
           - name: wait-etcd
             env:
@@ -402,7 +402,7 @@ spec:
           volumeName: config
       podSpec:
         nodeSelector:
-          group: pika
+          group: vpc_default
         initContainers:
           - name: wait-etcd
             env:

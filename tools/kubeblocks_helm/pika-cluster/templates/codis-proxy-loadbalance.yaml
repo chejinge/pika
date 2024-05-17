@@ -3,7 +3,7 @@ kind: LoadBalancer
 metadata:
   name: pika-codis-proxy-loadbalance
   labels:
-    {{- include "pika.labels" . | nindent 4 }}
+    {{ include "pika-cluster.labels" . | nindent 4 }}
     component: pika-codis-proxy-loadbalance
 spec:
   provider:
