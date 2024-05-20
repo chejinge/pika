@@ -84,11 +84,11 @@ resources:
 persistence:
   enabled: true
   pikaData:
-    storageClassName: local-storage
+    storageClassName: open-local-lvm
     size: 50Gi
     volumeMode: Filesystem
   etcdData:
-    storageClassName: local-storage
+    storageClassName: open-local-lvm
     size: 50Gi
     volumeMode: Filesystem
 
