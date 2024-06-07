@@ -48,6 +48,7 @@ spec:
       podSpec:
         nodeSelector:
           group: pika
+          qihoo.cloud/open-local: "true"
         {{- if .Values.imagePullSecrets }}
         imagePullSecrets:
         {{- range .Values.imagePullSecrets }}
@@ -117,6 +118,7 @@ spec:
       podSpec:
         nodeSelector:
           group: pika
+          qihoo.cloud/open-local: "true"
         initContainers:
           - name: volume-permissions
             image: busybox:1.28
@@ -228,6 +230,7 @@ spec:
       podSpec:
         nodeSelector:
           group: pika
+          qihoo.cloud/open-local: "false"
         initContainers:
           - name: wait-codis-dashboard
             env:
@@ -276,6 +279,7 @@ spec:
       podSpec:
         nodeSelector:
           group: pika
+          qihoo.cloud/open-local: "false"
         initContainers:
           - name: wait-etcd
             env:
@@ -349,6 +353,7 @@ spec:
       podSpec:
         nodeSelector:
           group: pika
+          qihoo.cloud/open-local: "false"
         initContainers:
           - name: wait-etcd
             env:
@@ -403,6 +408,7 @@ spec:
       podSpec:
         nodeSelector:
           group: pika
+          qihoo.cloud/open-local: "false"
         initContainers:
           - name: wait-etcd
             env:
