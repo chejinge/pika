@@ -21,11 +21,11 @@ rocksdb-periodic-second : 86400 * 3;
 # The number of threads for running Pika.
 # It's not recommended to set this value exceeds
 # the number of CPU cores on the deployment server.
-thread-num : 18
+thread-num : 14
 
 # Size of the thread pool, The threads within this pool
 # are dedicated to handling user requests.
-thread-pool-size : 18
+thread-pool-size : 14
 
 # This parameter is used to control whether to separate fast and slow commands.
 # When slow-cmd-pool is set to yes, fast and slow commands are separated.
@@ -356,13 +356,13 @@ compression : snappy
 # then max-background-flushs' and 'max-background-compactions will be auto config by rocksdb, specifically:
 # 1/4 of max-background-jobs will be given to max-background-flushs' and the rest(3/4) will be given to  'max-background-compactions'.
 # 'max-background-jobs' default value is 3 and the value range is [2, 12].
-max-background-jobs : 8
+max-background-jobs : 6
 
 # The number of background flushing threads.
 # max-background-flushes default value is -1 and the value range is [1, 4] or -1.
 # if 'max-background-flushes' is set to -1, the 'max-background-compactions' should also be set to -1,
 # which means let rocksdb to auto config them based on the value of 'max-background-jobs'
-max-background-flushes : 4
+max-background-flushes : 3
 
 # [NOTICE] you MUST NOT set one of the max-background-flushes or max-background-compactions to -1 while setting another one to other values(not -1).
 # They SHOULD both be -1 or both not(if you want to config them manually).
@@ -371,7 +371,7 @@ max-background-flushes : 4
 # max-background-compactions default value is -1 and the value range is [1, 8] or -1.
 # if 'max-background-compactions' is set to -1, the 'max-background-flushes' should also be set to -1,
 # which means let rocksdb to auto config them based on the value of 'max-background-jobs'
-max-background-compactions : 4
+max-background-compactions : 3
 
 # RocksDB delayed-write-rate, default is 0(infer from rate-limiter by RocksDB)
 # Ref from rocksdb: Whenever stall conditions are triggered, RocksDB will reduce write rate to delayed_write_rate,

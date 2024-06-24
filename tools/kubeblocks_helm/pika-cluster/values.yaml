@@ -40,10 +40,10 @@ resources:
   # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
   pikaGroup:
     limits:
-      cpu: 20000m
+      cpu: 15000m
       memory: 50Gi
     requests:
-      cpu: 20000m
+      cpu: 15000m
       memory: 50Gi
   etcd:
     limits:
@@ -62,10 +62,10 @@ resources:
   codisProxy:
     limits:
       cpu: 4000m
-      memory: 8Gi
+      memory: 4Gi
     requests:
       cpu: 4000m
-      memory: 8Gi
+      memory: 4Gi
   codisFe:
     limits:
       cpu: 2000m
