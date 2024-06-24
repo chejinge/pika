@@ -42,7 +42,7 @@ jodis_compatible = false
 proxy_datacenter = ""
 
 # Set max number of alive sessions.
-proxy_max_clients = 1000
+proxy_max_clients = 2000
 
 # Set max offheap memory size. (0 to disable)
 proxy_max_offheap_size = "1024mb"
@@ -71,8 +71,8 @@ backend_primary_only = false
 backend_primary_parallel = 10
 backend_replica_parallel = 10
 # Set quick backend parallel connections per server
-backend_primary_quick = 8
-backend_replica_quick = 8
+backend_primary_quick = 1
+backend_replica_quick = 1
 
 # Set slot num
 max_slot_num = 1024
@@ -108,7 +108,7 @@ slowlog_log_slower_than = 100000
 # quick command list
 quick_cmd_list = "get,set"
 # slow command list
-slow_cmd_list = "mget, mset"
+slow_cmd_list = ""
 
 # Set metrics server (such as http://localhost:28000), proxy will report json formatted metrics to specified server in a predefined period.
 metrics_report_server = ""
