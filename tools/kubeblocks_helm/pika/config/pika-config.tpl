@@ -21,11 +21,11 @@ rocksdb-periodic-second : 86400 * 3;
 # The number of threads for running Pika.
 # It's not recommended to set this value exceeds
 # the number of CPU cores on the deployment server.
-thread-num : 14
+thread-num : 8
 
 # Size of the thread pool, The threads within this pool
 # are dedicated to handling user requests.
-thread-pool-size : 14
+thread-pool-size : 10
 
 # This parameter is used to control whether to separate fast and slow commands.
 # When slow-cmd-pool is set to yes, fast and slow commands are separated.
@@ -34,7 +34,7 @@ slow-cmd-pool : no
 
 # The number of sync-thread for data replication from master, those are the threads work on slave nodes
 # and are used to execute commands sent from master node when replicating.
-sync-thread-num : 12
+sync-thread-num : 6
 
 # The num of threads to write binlog in slaveNode when replicating,
 # each DB cloud only bind to one sync-binlog-thread to write binlog in maximum
@@ -401,7 +401,7 @@ max-bytes-for-level-multiplier : 10
 slotmigrate : no
 
 # slotmigrate thread num
-slotmigrate-thread-num : 4
+slotmigrate-thread-num : 3
 
 # thread-migrate-keys-num  1/8 of the write_buffer_size_
 thread-migrate-keys-num : 64

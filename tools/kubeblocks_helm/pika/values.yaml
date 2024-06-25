@@ -4,17 +4,17 @@ image:
   pika:
     registry: r.so.qihoo.net/infra
     repository: pika/pika
-    tag: v3.5.4-rc1
+    tag: v4.0.0
     pullPolicy: IfNotPresent
   pikaExporter:
     registry: r.so.qihoo.net/infra
     repository: pika/pika-exporter
-    tag: v3.5.4-rc1
+    tag: v3.5.4
     pullPolicy: IfNotPresent
   codis:
     registry: r.so.qihoo.net/infra
     repository: pika/pika-codis
-    tag: v3.5.4-rc1
+    tag: 3.5.4
     pullPolicy: IfNotPresent
   etcd:
     registry: r.so.qihoo.net/qsssre

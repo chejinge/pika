@@ -40,11 +40,11 @@ resources:
   # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
   pikaGroup:
     limits:
-      cpu: 15000m
-      memory: 50Gi
+      cpu: 10000m
+      memory: 36Gi
     requests:
-      cpu: 15000m
-      memory: 50Gi
+      cpu: 10000m
+      memory: 36Gi
   etcd:
     limits:
       cpu: 4000m
