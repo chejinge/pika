@@ -532,14 +532,10 @@ void FlushallCmd::DoThroughDB() {
   Do();
 }
 
-void FlushallCmd::DoUpdateCache(std::shared_ptr<DB> db) {
-  if (!flushall_succeed_) {
-    //flushdb failed, also don't clear the cache
-    return;
-  }
+void FlushallCmd::DoFlushCache(std::shared_ptr<DB> db) {
   // clear cache
   if (PIKA_CACHE_NONE != g_pika_conf->cache_mode()) {
-    g_pika_server->ClearCacheDbAsync(db);
+    g_pika_server->ClearCacheDbAsync(std::move(db));
   }
 }
 
@@ -570,14 +566,58 @@ bool FlushallCmd::DoWithoutLock(std::shared_ptr<DB> db) {
     res_.SetRes(CmdRes::kErrOther,db->GetDBName() + " flushall failed due to other Errors, please check Error/Warning log to know more");
     return false;
   }
-  DoUpdateCache(db);
-
+  DoFlushCache(db);
   return true;
 }
+
+
+void FlushallCmd::DoBinlogByDB(const std::shared_ptr<SyncMasterDB>& sync_db) {
+  if (res().ok() && is_write() && g_pika_conf->write_binlog()) {
+    std::shared_ptr<net::NetConn> conn_ptr = GetConn();
+    std::shared_ptr<std::string> resp_ptr = GetResp();
+    // Consider that dummy cmd appended by system, both conn and resp are null.
+    if ((!conn_ptr || !resp_ptr) && (name_ != kCmdDummy)) {
+      if (!conn_ptr) {
+        LOG(WARNING) << sync_db->SyncDBInfo().ToString() << " conn empty.";
+      }
+      if (!resp_ptr) {
+        LOG(WARNING) << sync_db->SyncDBInfo().ToString() << " resp empty.";
+      }
+      res().SetRes(CmdRes::kErrOther);
+      return;
+    }
+
+    Status s = sync_db->ConsensusProposeLog(shared_from_this());
+    if (!s.ok()) {
+      LOG(WARNING) << sync_db->SyncDBInfo().ToString() << " Writing binlog failed, maybe no space left on device "
+                   << s.ToString();
+      res().SetRes(CmdRes::kErrOther, s.ToString());
+      return;
+    }
+  }
+}
+
+
 void FlushallCmd::DoBinlog() {
   if (flushall_succeed_) {
-    Cmd::DoBinlog();
+    for (auto& db : g_pika_server->GetDB()) {
+      DBInfo info(db.second->GetDBName());
+      DoBinlogByDB(g_pika_rm->GetSyncMasterDBByName(info));
+    }
   }
+}
+
+//let flushall use
+std::string FlushallCmd::ToRedisProtocol() {
+  std::string content;
+  content.reserve(RAW_ARGS_LEN);
+  RedisAppendLen(content, 1, "*");
+
+  // to flushdb cmd
+  std::string flushdb_cmd("flushdb");
+  RedisAppendLenUint64(content, flushdb_cmd.size(), "$");
+  RedisAppendContent(content, flushdb_cmd);
+  return content;
 }
 
 void FlushdbCmd::DoInitial() {
@@ -682,8 +722,15 @@ void ClientCmd::DoInitial() {
       res_.SetRes(CmdRes::kErrOther, "Syntax error, try CLIENT (LIST [order by [addr|idle])");
       return;
     }
-  } else if ((strcasecmp(argv_[1].data(), "kill") == 0) && argv_.size() == 3) {
+  } else if (argv_.size() == 3 && (strcasecmp(argv_[1].data(), "kill") == 0)) {
     info_ = argv_[2];
+  } else if (argv_.size() == 4 &&
+             (strcasecmp(argv_[1].data(), "kill") == 0) &&
+             (strcasecmp(argv_[2].data(), "type") == 0) &&
+             ((strcasecmp(argv_[3].data(), KILLTYPE_NORMAL.data()) == 0) || (strcasecmp(argv_[3].data(), KILLTYPE_PUBSUB.data()) == 0))) {
+    //kill all if user wanna kill a type
+    info_ = "type";
+    kill_type_ = argv_[3];
   } else {
     res_.SetRes(CmdRes::kErrOther, "Syntax error, try CLIENT (LIST [order by [addr|idle]| KILL ip:port)");
     return;
@@ -733,6 +780,16 @@ void ClientCmd::Do() {
   } else if ((strcasecmp(operation_.data(), "kill") == 0) && (strcasecmp(info_.data(), "all") == 0)) {
     g_pika_server->ClientKillAll();
     res_.SetRes(CmdRes::kOk);
+  } else if ((strcasecmp(operation_.data(), "kill") == 0) && (strcasecmp(info_.data(), "type") == 0)) {
+    if (kill_type_ == KILLTYPE_NORMAL) {
+      g_pika_server->ClientKillAllNormal();
+      res_.SetRes(CmdRes::kOk);
+    } else if (kill_type_ == KILLTYPE_PUBSUB) {
+      g_pika_server->ClientKillPubSub();
+      res_.SetRes(CmdRes::kOk);
+    } else {
+      res_.SetRes(CmdRes::kErrOther, "kill type is unknown");
+    }
   } else if (g_pika_server->ClientKill(info_) == 1) {
     res_.SetRes(CmdRes::kOk);
   } else {
@@ -786,6 +843,10 @@ const std::string InfoCmd::kRocksDBSection = "rocksdb";
 const std::string InfoCmd::kDebugSection = "debug";
 const std::string InfoCmd::kCommandStatsSection = "commandstats";
 const std::string InfoCmd::kCacheSection = "cache";
+
+
+const std::string ClientCmd::KILLTYPE_NORMAL = "normal";
+const std::string ClientCmd::KILLTYPE_PUBSUB = "pubsub";
 
 void InfoCmd::Execute() {
   std::shared_ptr<DB> db = g_pika_server->GetDB(db_name_);
@@ -1198,6 +1259,7 @@ void InfoCmd::InfoReplication(std::string& info) {
   Status s;
   uint32_t filenum = 0;
   uint64_t offset = 0;
+  uint64_t slave_repl_offset = 0;
   std::string safety_purge;
   std::shared_ptr<SyncMasterDB> master_db = nullptr;
   for (const auto& t_item : g_pika_server->dbs_) {
@@ -1209,11 +1271,13 @@ void InfoCmd::InfoReplication(std::string& info) {
       continue;
     }
     master_db->Logger()->GetProducerStatus(&filenum, &offset);
+    slave_repl_offset += static_cast<uint64_t>(filenum) * static_cast<uint64_t>(g_pika_conf->binlog_file_size());
+    slave_repl_offset += offset;
     tmp_stream << db_name << ":binlog_offset=" << filenum << " " << offset;
     s = master_db->GetSafetyPurgeBinlog(&safety_purge);
     tmp_stream << ",safety_purge=" << (s.ok() ? safety_purge : "error") << "\r\n";
   }
-
+  tmp_stream << "slave_repl_offset:" << slave_repl_offset << "\r\n";
   info.append(tmp_stream.str());
 }
 
@@ -2199,6 +2263,18 @@ void ConfigCmd::ConfigGet(std::string& ret) {
     EncodeString(&config_body, "acl-pubsub-default");
     g_pika_conf->acl_pubsub_default() ? EncodeString(&config_body, "allchannels")
                                       : EncodeString(&config_body, "resetchannels");
+  }
+
+  if (pstd::stringmatch(pattern.data(), "enable-db-statistics", 1)) {
+    elements += 2;
+    EncodeString(&config_body, "enable-db-statistics");
+    EncodeString(&config_body, g_pika_conf->enable_db_statistics() ? "yes" : "no");
+  }
+
+  if (pstd::stringmatch(pattern.data(), "db-statistics-level", 1)) {
+    elements += 2;
+    EncodeString(&config_body, "db-statistics-level");
+    EncodeNumber(&config_body, g_pika_conf->db_statistics_level());
   }
 
   std::stringstream resp;
