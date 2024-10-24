@@ -388,7 +388,7 @@ void InitCmdTable(CmdTable* cmd_table) {
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameHDel, std::move(hdelptr)));
   ////HSetCmd
   std::unique_ptr<Cmd> hsetptr =
-      std::make_unique<HMsetCmd>(kCmdNameHSet, -3, kCmdFlagsWrite |  kCmdFlagsHash | kCmdFlagsUpdateCache | kCmdFlagsDoThroughDB | kCmdFlagsFast);
+      std::make_unique<HMsetCmd>(kCmdNameHSet, -4, kCmdFlagsWrite |  kCmdFlagsHash | kCmdFlagsUpdateCache | kCmdFlagsDoThroughDB | kCmdFlagsFast);
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameHSet, std::move(hsetptr)));
   ////HGetCmd
   std::unique_ptr<Cmd> hgetptr =
