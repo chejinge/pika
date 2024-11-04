@@ -516,6 +516,9 @@ Status PikaServer::DoSameThingEveryDB(const TaskType& type) {
       case TaskType::kCompactAll:
         db_item.second->Compact(storage::DataType::kAll);
         break;
+      case TaskType::kCompactOldestOrBestDeleteRatioSst:
+        db_item.second->LongestNotCompactionSstCompact(storage::DataType::kAll);
+        break;
       default:
         break;
     }
@@ -611,7 +614,7 @@ int32_t PikaServer::GetSlaveListString(std::string& slave_list_str) {
               master_boffset.offset - sent_slave_boffset.offset;
           tmp_stream << "(" << db->DBName() << ":" << lag << ")";
         }
-      } else if (s.ok() && slave_state == SlaveState::kSlaveDbSync){
+      } else if (s.ok() && slave_state == SlaveState::kSlaveDbSync) {
         tmp_stream << "(" << db->DBName() << ":full syncing)";
       } else {
         tmp_stream << "(" << db->DBName() << ":not syncing)";
@@ -998,7 +1001,12 @@ uint64_t PikaServer::ServerCurrentQps() { return statistic_.server_stat.qps.last
 
 uint64_t PikaServer::accumulative_connections() { return statistic_.server_stat.accumulative_connections.load(); }
 
+long long PikaServer::ServerKeyspaceHits() { return statistic_.server_stat.keyspace_hits.load(); } 
+long long PikaServer::ServerKeyspaceMisses() { return statistic_.server_stat.keyspace_misses.load(); }
+
 void PikaServer::incr_accumulative_connections() { ++(statistic_.server_stat.accumulative_connections); }
+void PikaServer::incr_server_keyspace_hits() { ++(statistic_.server_stat.keyspace_hits); }
+void PikaServer::incr_server_keyspace_misses() { ++(statistic_.server_stat.keyspace_misses); }
 
 // only one thread invoke this right now
 void PikaServer::ResetLastSecQuerynum() {
@@ -1219,6 +1227,12 @@ void PikaServer::AutoCompactRange() {
                      << free_size / 1048576 << "MB, disksize: " << total_size / 1048576 << "MB";
       }
     }
+  }
+
+  if (g_pika_conf->compaction_strategy() == PikaConf::FullCompact) {
+    DoSameThingEveryDB(TaskType::kCompactAll);
+  } else if (g_pika_conf->compaction_strategy() == PikaConf::OldestOrBestDeleteRatioSstCompact) {
+    DoSameThingEveryDB(TaskType::kCompactOldestOrBestDeleteRatioSst);
   }
 }
 
@@ -1483,6 +1497,13 @@ void PikaServer::InitStorageOptions() {
   storage_options_.statistics_max_size = g_pika_conf->max_cache_statistic_keys();
   storage_options_.small_compaction_threshold = g_pika_conf->small_compaction_threshold();
 
+ // For Storage compaction
+  storage_options_.compact_param_.best_delete_min_ratio_ = g_pika_conf->best_delete_min_ratio();
+  storage_options_.compact_param_.dont_compact_sst_created_in_seconds_ = g_pika_conf->dont_compact_sst_created_in_seconds();
+  storage_options_.compact_param_.force_compact_file_age_seconds_ = g_pika_conf->force_compact_file_age_seconds();
+  storage_options_.compact_param_.force_compact_min_delete_ratio_ = g_pika_conf->force_compact_min_delete_ratio();
+  storage_options_.compact_param_.compact_every_num_of_files_ = g_pika_conf->compact_every_num_of_files();
+
   // rocksdb blob
   if (g_pika_conf->enable_blob_files()) {
     storage_options_.options.enable_blob_files = g_pika_conf->enable_blob_files();
@@ -1599,7 +1620,7 @@ void DoBgslotsreload(void* arg) {
   rocksdb::Status s;
   std::vector<std::string> keys;
   int64_t cursor_ret = -1;
-  while(cursor_ret != 0 && p->GetSlotsreloading()){
+  while(cursor_ret != 0 && p->GetSlotsreloading()) {
     cursor_ret = reload.db->storage()->Scan(storage::DataType::kAll, reload.cursor, reload.pattern, reload.count, &keys);
 
     std::vector<std::string>::const_iterator iter;
@@ -1607,8 +1628,8 @@ void DoBgslotsreload(void* arg) {
       std::string key_type;
       int s = GetKeyType(*iter, key_type, reload.db);
       //if key is slotkey, can't add to SlotKey
-      if (s > 0){
-        if (key_type == "s" && ((*iter).find(SlotKeyPrefix) != std::string::npos || (*iter).find(SlotTagPrefix) != std::string::npos)){
+      if (s > 0) {
+        if (key_type == "s" && ((*iter).find(SlotKeyPrefix) != std::string::npos || (*iter).find(SlotTagPrefix) != std::string::npos)) {
           continue;
         }
 
@@ -1716,7 +1737,7 @@ void DoBgslotscleanup(void* arg) {
   std::vector<std::string> keys;
   int64_t cursor_ret = -1;
   std::vector<int> cleanupSlots(cleanup.cleanup_slots);
-  while (cursor_ret != 0 && p->GetSlotscleaningup()){
+  while (cursor_ret != 0 && p->GetSlotscleaningup()) {
     cursor_ret = g_pika_server->bgslots_cleanup_.db->storage()->Scan(storage::DataType::kAll, cleanup.cursor, cleanup.pattern, cleanup.count, &keys);
 
     std::string key_type;
@@ -1725,12 +1746,12 @@ void DoBgslotscleanup(void* arg) {
       if ((*iter).find(SlotKeyPrefix) != std::string::npos || (*iter).find(SlotTagPrefix) != std::string::npos) {
         continue;
       }
-      if (std::find(cleanupSlots.begin(), cleanupSlots.end(), GetSlotID(g_pika_conf->default_slot_num(), *iter)) != cleanupSlots.end()){
+      if (std::find(cleanupSlots.begin(), cleanupSlots.end(), GetSlotID(g_pika_conf->default_slot_num(), *iter)) != cleanupSlots.end()) {
         if (GetKeyType(*iter, key_type, g_pika_server->bgslots_cleanup_.db) <= 0) {
           LOG(WARNING) << "slots clean get key type for slot " << GetSlotID(g_pika_conf->default_slot_num(), *iter) << " key " << *iter << " error";
           continue;
         }
-        if (DeleteKey(*iter, key_type[0], g_pika_server->bgslots_cleanup_.db) <= 0){
+        if (DeleteKey(*iter, key_type[0], g_pika_server->bgslots_cleanup_.db) <= 0) {
           LOG(WARNING) << "slots clean del for slot " << GetSlotID(g_pika_conf->default_slot_num(), *iter) << " key "<< *iter << " error";
         }
       }
@@ -1741,7 +1762,7 @@ void DoBgslotscleanup(void* arg) {
     keys.clear();
   }
 
-  for (int cleanupSlot : cleanupSlots){
+  for (int cleanupSlot : cleanupSlots) {
     WriteDelKeyToBinlog(GetSlotKey(cleanupSlot), g_pika_server->bgslots_cleanup_.db);
     WriteDelKeyToBinlog(GetSlotsTagKey(cleanupSlot), g_pika_server->bgslots_cleanup_.db);
   }

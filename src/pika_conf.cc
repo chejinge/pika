@@ -184,7 +184,7 @@ int PikaConf::Load() {
 
   std::string admin_cmd_list;
   GetConfStr("admin-cmd-list", &admin_cmd_list);
-  if (admin_cmd_list == ""){
+  if (admin_cmd_list == "") {
     admin_cmd_list = "info, monitor, ping";
     SetAdminCmd(admin_cmd_list);
   }
@@ -305,6 +305,41 @@ int PikaConf::Load() {
     max_subcompactions_ = 1;
   }
 
+  GetConfInt("compact-every-num-of-files", &compact_every_num_of_files_);
+  if (compact_every_num_of_files_ < 10) {
+    compact_every_num_of_files_ = 10;
+  }
+
+  GetConfInt("force-compact-file-age-seconds", &force_compact_file_age_seconds_);
+  if (force_compact_file_age_seconds_ < 300) {
+    force_compact_file_age_seconds_ = 300;
+  }
+
+  GetConfInt("force-compact-min-delete-ratio", &force_compact_min_delete_ratio_);
+  if (force_compact_min_delete_ratio_ < 10) {
+    force_compact_min_delete_ratio_ = 10;
+  }
+
+  GetConfInt("dont-compact-sst-created-in-seconds", &dont_compact_sst_created_in_seconds_);
+  if (dont_compact_sst_created_in_seconds_ < 600) {
+    dont_compact_sst_created_in_seconds_ = 600;
+  }
+
+  GetConfInt("best-delete-min-ratio", &best_delete_min_ratio_);
+  if (best_delete_min_ratio_ < 10) {
+    best_delete_min_ratio_ = 10;
+  }
+
+  std::string cs_;
+  GetConfStr("compaction-strategy", &cs_);
+  if (cs_ == "full-compact") {
+    compaction_strategy_ = FullCompact;
+  } else if (cs_ == "obd-compact") {
+    compaction_strategy_ = OldestOrBestDeleteRatioSstCompact;
+  } else {
+    compaction_strategy_ = NONE;
+  }
+
   // least-free-disk-resume-size
   GetConfInt64Human("least-free-disk-resume-size", &least_free_disk_to_resume_);
   if (least_free_disk_to_resume_ <= 0) {
@@ -421,7 +456,7 @@ int PikaConf::Load() {
   }
 
   // target_file_size_base
-  GetConfIntHuman("target-file-size-base", &target_file_size_base_);
+  GetConfInt64Human("target-file-size-base", &target_file_size_base_);
   if (target_file_size_base_ <= 0) {
     target_file_size_base_ = 1048576;  // 10Mb
   }
@@ -640,6 +675,13 @@ int PikaConf::Load() {
   }
   zset_cache_field_num_per_key_ = zset_cache_field_num_per_key;
 
+  int max_key_size_in_cache = DEFAULT_CACHE_MAX_KEY_SIZE;
+  GetConfInt("max-key-size-in-cache", &max_key_size_in_cache);
+  if (max_key_size_in_cache <= 0) {
+    max_key_size_in_cache = DEFAULT_CACHE_MAX_KEY_SIZE;
+  }
+  max_key_size_in_cache_ = max_key_size_in_cache;
+
   int64_t cache_maxmemory = PIKA_CACHE_SIZE_DEFAULT;
   GetConfInt64("cache-maxmemory", &cache_maxmemory);
   cache_maxmemory_ = (PIKA_CACHE_SIZE_MIN > cache_maxmemory) ? PIKA_CACHE_SIZE_DEFAULT : cache_maxmemory;
@@ -724,11 +766,13 @@ int PikaConf::Load() {
 
   int64_t tmp_rsync_timeout_ms = -1;
   GetConfInt64("rsync-timeout-ms", &tmp_rsync_timeout_ms);
-  if(tmp_rsync_timeout_ms <= 0){
+  if (tmp_rsync_timeout_ms <= 0) {
     rsync_timeout_ms_.store(1000);
   } else {
     rsync_timeout_ms_.store(tmp_rsync_timeout_ms);
   }
+
+  GetConfBool("wash-data", &wash_data_);
 
   return ret;
 }
@@ -796,6 +840,37 @@ int PikaConf::ConfigRewrite() {
   SetConfInt("db-sync-speed", db_sync_speed_);
   SetConfStr("compact-cron", compact_cron_);
   SetConfStr("compact-interval", compact_interval_);
+  SetConfInt("compact-every-num-of-files", compact_every_num_of_files_);
+  if (compact_every_num_of_files_ < 1) {
+    compact_every_num_of_files_ = 1;
+  }
+  SetConfInt("force-compact-file-age-seconds", force_compact_file_age_seconds_);
+  if (force_compact_file_age_seconds_ < 300) {
+    force_compact_file_age_seconds_ = 300;
+  }
+  SetConfInt("force-compact-min-delete-ratio", force_compact_min_delete_ratio_);
+  if (force_compact_min_delete_ratio_ < 5) {
+    force_compact_min_delete_ratio_ = 5;
+  }
+  SetConfInt("dont-compact-sst-created-in-seconds", dont_compact_sst_created_in_seconds_);
+  if (dont_compact_sst_created_in_seconds_ < 300) {
+    dont_compact_sst_created_in_seconds_ = 300;
+  }
+  SetConfInt("best-delete-min-ratio", best_delete_min_ratio_);
+  if (best_delete_min_ratio_ < 10) {
+    best_delete_min_ratio_ = 10;
+  }
+
+  std::string cs_;
+  SetConfStr("compaction-strategy", cs_);
+  if (cs_ == "full-compact") {
+    compaction_strategy_ = FullCompact;
+  } else if (cs_ == "obd-compact") {
+    compaction_strategy_ = OldestOrBestDeleteRatioSstCompact;
+  } else {
+    compaction_strategy_ = NONE;
+  }
+
   SetConfStr("disable_auto_compactions", disable_auto_compactions_ ? "true" : "false");
   SetConfStr("cache-type", scachetype);
   SetConfInt64("least-free-disk-resume-size", least_free_disk_to_resume_);

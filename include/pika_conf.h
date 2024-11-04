@@ -29,6 +29,11 @@ const uint32_t configReplicationIDSize = 50;
 // global class, class members well initialized
 class PikaConf : public pstd::BaseConf {
  public:
+  enum CompactionStrategy {
+    NONE,
+    FullCompact,
+    OldestOrBestDeleteRatioSstCompact
+  };
   PikaConf(const std::string& path);
   ~PikaConf() override = default;
 
@@ -117,6 +122,30 @@ class PikaConf : public pstd::BaseConf {
   int max_subcompactions() {
     std::shared_lock l(rwlock_);
     return max_subcompactions_;
+  }
+  int compact_every_num_of_files() {
+    std::shared_lock l(rwlock_);
+    return compact_every_num_of_files_;
+  }
+  int force_compact_file_age_seconds() {
+    std::shared_lock l(rwlock_);
+    return force_compact_file_age_seconds_;
+  }
+  int force_compact_min_delete_ratio() {
+    std::shared_lock l(rwlock_);
+    return force_compact_min_delete_ratio_;
+  }
+  int dont_compact_sst_created_in_seconds() {
+    std::shared_lock l(rwlock_);
+    return dont_compact_sst_created_in_seconds_;
+  }
+  int best_delete_min_ratio() {
+    std::shared_lock l(rwlock_);
+    return best_delete_min_ratio_;
+  }
+  CompactionStrategy compaction_strategy() {
+    std::shared_lock l(rwlock_);
+    return compaction_strategy_;
   }
   bool disable_auto_compactions() {
     std::shared_lock l(rwlock_);
@@ -270,7 +299,7 @@ class PikaConf : public pstd::BaseConf {
     std::shared_lock l(rwlock_);
     return compression_;
   }
-  int target_file_size_base() {
+  int64_t target_file_size_base() {
     std::shared_lock l(rwlock_);
     return target_file_size_base_;
   }
@@ -331,6 +360,10 @@ class PikaConf : public pstd::BaseConf {
   bool share_block_cache() {
     std::shared_lock l(rwlock_);
     return share_block_cache_;
+  }
+  bool wash_data() {
+    std::shared_lock l(rwlock_);
+    return wash_data_;
   }
   bool enable_partitioned_index_filters() {
     std::shared_lock l(rwlock_);
@@ -423,6 +456,7 @@ class PikaConf : public pstd::BaseConf {
   void SetCacheMode(const int value) { cache_mode_ = value; }
   void SetCacheStartDirection(const int value) { zset_cache_start_direction_ = value; }
   void SetCacheItemsPerKey(const int value) { zset_cache_field_num_per_key_ = value; }
+  void SetCacheMaxKeySize(const int value) { max_key_size_in_cache_ = value; }
   void SetCacheMaxmemory(const int64_t value) { cache_maxmemory_ = value; }
   void SetCacheMaxmemoryPolicy(const int value) { cache_maxmemory_policy_ = value; }
   void SetCacheMaxmemorySamples(const int value) { cache_maxmemory_samples_ = value; }
@@ -893,6 +927,7 @@ class PikaConf : public pstd::BaseConf {
   void SetCacheDisableFlag() { tmp_cache_disable_flag_ = true; }
   int zset_cache_start_direction() { return zset_cache_start_direction_; }
   int zset_cache_field_num_per_key() { return zset_cache_field_num_per_key_; }
+  int max_key_size_in_cache() { return max_key_size_in_cache_; }
   int cache_maxmemory_policy() { return cache_maxmemory_policy_; }
   int cache_maxmemory_samples() { return cache_maxmemory_samples_; }
   int cache_lfu_decay_time() { return cache_lfu_decay_time_; }
@@ -927,6 +962,15 @@ class PikaConf : public pstd::BaseConf {
   std::string compact_interval_;
   int max_subcompactions_ = 1;
   bool disable_auto_compactions_ = false;
+
+  // for obd_compact
+  int compact_every_num_of_files_;
+  int force_compact_file_age_seconds_;
+  int force_compact_min_delete_ratio_;
+  int dont_compact_sst_created_in_seconds_;
+  int best_delete_min_ratio_;
+  CompactionStrategy compaction_strategy_;
+
   int64_t resume_check_interval_ = 60; // seconds
   int64_t least_free_disk_to_resume_ = 268435456; // 256 MB
   double min_check_resume_ratio_ = 0.7;
@@ -1027,7 +1071,7 @@ class PikaConf : public pstd::BaseConf {
   // Critical configure items
   //
   bool write_binlog_ = false;
-  int target_file_size_base_ = 0;
+  int64_t target_file_size_base_ = 0;
   int64_t max_compaction_bytes_ = 0;
   int binlog_file_size_ = 0;
 
@@ -1045,6 +1089,7 @@ class PikaConf : public pstd::BaseConf {
   std::atomic_int cache_bit_ = 1;
   std::atomic_int zset_cache_start_direction_ = 0;
   std::atomic_int zset_cache_field_num_per_key_ = 512;
+  std::atomic_int max_key_size_in_cache_ = 512;
   std::atomic_int cache_maxmemory_policy_ = 1;
   std::atomic_int cache_maxmemory_samples_ = 5;
   std::atomic_int cache_lfu_decay_time_ = 1;
@@ -1069,6 +1114,9 @@ class PikaConf : public pstd::BaseConf {
 
   //Internal used metrics Persisted by pika.conf
   std::unordered_set<std::string> internal_used_unfinished_full_sync_;
+
+  // for wash data from 4.0.0 to 4.0.1
+  bool wash_data_;
 };
 
 #endif

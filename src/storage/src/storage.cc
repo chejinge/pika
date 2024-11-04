@@ -89,10 +89,19 @@ static std::string AppendSubDirectory(const std::string& db_path, int index) {
   }
 }
 
+std::vector<rocksdb::ColumnFamilyHandle*> Storage::GetHashCFHandles(const int idx) {
+  return insts_[idx]->GetHashCFHandles();
+}
+
+rocksdb::WriteOptions Storage::GetDefaultWriteOptions(const int idx) const {
+  return insts_[idx]->GetDefaultWriteOptions();
+}
+
 Status Storage::Open(const StorageOptions& storage_options, const std::string& db_path) {
   mkpath(db_path.c_str(), 0755);
 
   int inst_count = db_instance_num_;
+  storage_options_ = storage_options;
   for (int index = 0; index < inst_count; index++) {
     insts_.emplace_back(std::make_unique<Redis>(this, index));
     Status s = insts_.back()->Open(storage_options, AppendSubDirectory(db_path, index));
@@ -125,9 +134,7 @@ Status Storage::StoreCursorStartKey(const DataType& dtype, int64_t cursor, char 
   return cursors_store_->Insert(index_key, index_value);
 }
 
-std::unique_ptr<Redis>& Storage::GetDBInstance(const Slice& key) {
-  return GetDBInstance(key.ToString());
-}
+std::unique_ptr<Redis>& Storage::GetDBInstance(const Slice& key) { return GetDBInstance(key.ToString()); }
 
 std::unique_ptr<Redis>& Storage::GetDBInstance(const std::string& key) {
   auto inst_index = slot_indexer_->GetInstanceID(GetSlotID(slot_num_, key));
@@ -140,9 +147,9 @@ Status Storage::Set(const Slice& key, const Slice& value) {
   return inst->Set(key, value);
 }
 
-Status Storage::Setxx(const Slice& key, const Slice& value, int32_t* ret, int64_t ttl) {
+Status Storage::Setxx(const Slice& key, const Slice& value, int32_t* ret, int64_t ttl_millsec) {
   auto& inst = GetDBInstance(key);
-  return inst->Setxx(key, value, ret, ttl);
+  return inst->Setxx(key, value, ret, ttl_millsec);
 }
 
 Status Storage::Get(const Slice& key, std::string* value) {
@@ -150,14 +157,14 @@ Status Storage::Get(const Slice& key, std::string* value) {
   return inst->Get(key, value);
 }
 
-Status Storage::GetWithTTL(const Slice& key, std::string* value, int64_t* ttl) {
+Status Storage::GetWithTTL(const Slice& key, std::string* value, int64_t* ttl_millsec) {
   auto& inst = GetDBInstance(key);
-  return inst->GetWithTTL(key, value, ttl);
+  return inst->GetWithTTL(key, value, ttl_millsec);
 }
 
-Status Storage::MGetWithTTL(const Slice& key, std::string* value, int64_t* ttl) {
+Status Storage::MGetWithTTL(const Slice& key, std::string* value, int64_t* ttl_millsec) {
   auto& inst = GetDBInstance(key);
-  return inst->MGetWithTTL(key, value, ttl);
+  return inst->MGetWithTTL(key, value, ttl_millsec);
 }
 
 Status Storage::GetSet(const Slice& key, const Slice& value, std::string* old_value) {
@@ -196,7 +203,7 @@ Status Storage::MGet(const std::vector<std::string>& keys, std::vector<ValueStat
     s = inst->MGet(key, &value);
     if (s.ok()) {
       vss->push_back({value, Status::OK()});
-    } else if(s.IsNotFound()) {
+    } else if (s.IsNotFound()) {
       vss->push_back({std::string(), Status::NotFound()});
     } else {
       vss->clear();
@@ -212,12 +219,12 @@ Status Storage::MGetWithTTL(const std::vector<std::string>& keys, std::vector<Va
   for(const auto& key : keys) {
     auto& inst = GetDBInstance(key);
     std::string value;
-    int64_t ttl;
-    s = inst->MGetWithTTL(key, &value, &ttl);
+    int64_t ttl_millsec;
+    s = inst->MGetWithTTL(key, &value, &ttl_millsec);
     if (s.ok()) {
-      vss->push_back({value, Status::OK(), ttl});
+      vss->push_back({value, Status::OK(), ttl_millsec});
     } else if (s.IsNotFound()) {
-      vss->push_back({std::string(), Status::NotFound(), ttl});
+      vss->push_back({std::string(), Status::NotFound(), ttl_millsec});
     } else {
       vss->clear();
       return s;
@@ -226,9 +233,9 @@ Status Storage::MGetWithTTL(const std::vector<std::string>& keys, std::vector<Va
   return Status::OK();
 }
 
-Status Storage::Setnx(const Slice& key, const Slice& value, int32_t* ret, int64_t ttl) {
+Status Storage::Setnx(const Slice& key, const Slice& value, int32_t* ret, int64_t ttl_millsec) {
   auto& inst = GetDBInstance(key);
-  return inst->Setnx(key, value, ret, ttl);
+  return inst->Setnx(key, value, ret, ttl_millsec);
 }
 
 // disallowed in codis, only runs in pika classic mode
@@ -257,9 +264,9 @@ Status Storage::MSetnx(const std::vector<KeyValue>& kvs, int32_t* ret) {
   return s;
 }
 
-Status Storage::Setvx(const Slice& key, const Slice& value, const Slice& new_value, int32_t* ret, int64_t ttl) {
+Status Storage::Setvx(const Slice& key, const Slice& value, const Slice& new_value, int32_t* ret, int64_t ttl_millsec) {
   auto& inst = GetDBInstance(key);
-  return inst->Setvx(key, value, new_value, ret, ttl);
+  return inst->Setvx(key, value, new_value, ret, ttl_millsec);
 }
 
 Status Storage::Delvx(const Slice& key, const Slice& value, int32_t* ret) {
@@ -278,14 +285,14 @@ Status Storage::Getrange(const Slice& key, int64_t start_offset, int64_t end_off
 }
 
 Status Storage::GetrangeWithValue(const Slice& key, int64_t start_offset, int64_t end_offset,
-                                     std::string* ret, std::string* value, int64_t* ttl) {
+                                     std::string* ret, std::string* value, int64_t* ttl_millsec) {
   auto& inst = GetDBInstance(key);
-  return inst->GetrangeWithValue(key, start_offset, end_offset, ret, value, ttl);
+  return inst->GetrangeWithValue(key, start_offset, end_offset, ret, value, ttl_millsec);
 }
 
-Status Storage::Append(const Slice& key, const Slice& value, int32_t* ret, int64_t* expired_timestamp_sec, std::string& out_new_value) {
+Status Storage::Append(const Slice& key, const Slice& value, int32_t* ret, int64_t* expired_timestamp_millsec, std::string& out_new_value) {
   auto& inst = GetDBInstance(key);
-  return inst->Append(key, value, ret, expired_timestamp_sec, out_new_value);
+  return inst->Append(key, value, ret, expired_timestamp_millsec, out_new_value);
 }
 
 Status Storage::BitCount(const Slice& key, int64_t start_offset, int64_t end_offset, int32_t* ret, bool have_range) {
@@ -347,9 +354,9 @@ Status Storage::Decrby(const Slice& key, int64_t value, int64_t* ret) {
   return inst->Decrby(key, value, ret);
 }
 
-Status Storage::Incrby(const Slice& key, int64_t value, int64_t* ret, int64_t* expired_timestamp_sec) {
+Status Storage::Incrby(const Slice& key, int64_t value, int64_t* ret, int64_t* expired_timestamp_millsec) {
   auto& inst = GetDBInstance(key);
-  return inst->Incrby(key, value, ret, expired_timestamp_sec);
+  return inst->Incrby(key, value, ret, expired_timestamp_millsec);
 }
 
 Status Storage::Incrbyfloat(const Slice& key, const Slice& value, std::string* ret, int64_t* expired_timestamp_sec) {
@@ -357,9 +364,9 @@ Status Storage::Incrbyfloat(const Slice& key, const Slice& value, std::string* r
   return inst->Incrbyfloat(key, value, ret, expired_timestamp_sec);
 }
 
-Status Storage::Setex(const Slice& key, const Slice& value, int64_t ttl) {
+Status Storage::Setex(const Slice& key, const Slice& value, int64_t ttl_millsec) {
   auto& inst = GetDBInstance(key);
-  return inst->Setex(key, value, ttl);
+  return inst->Setex(key, value, ttl_millsec);
 }
 
 Status Storage::Strlen(const Slice& key, int32_t* len) {
@@ -367,9 +374,12 @@ Status Storage::Strlen(const Slice& key, int32_t* len) {
   return inst->Strlen(key, len);
 }
 
-Status Storage::PKSetexAt(const Slice& key, const Slice& value, int64_t timestamp) {
+Status Storage::PKSetexAt(const Slice& key, const Slice& value, int64_t time_stamp_millsec_) {
   auto& inst = GetDBInstance(key);
-  return inst->PKSetexAt(key, value, timestamp);
+  if (time_stamp_millsec_ < 0) {
+    time_stamp_millsec_ = pstd::NowMillis() - 1;
+  }
+  return inst->PKSetexAt(key, value, time_stamp_millsec_);
 }
 
 // Hashes Commands
@@ -398,9 +408,9 @@ Status Storage::HGetall(const Slice& key, std::vector<FieldValue>* fvs) {
   return inst->HGetall(key, fvs);
 }
 
-Status Storage::HGetallWithTTL(const Slice& key, std::vector<FieldValue>* fvs, int64_t* ttl) {
+Status Storage::HGetallWithTTL(const Slice& key, std::vector<FieldValue>* fvs, int64_t* ttl_millsec) {
   auto& inst = GetDBInstance(key);
-  return inst->HGetallWithTTL(key, fvs, ttl);
+  return inst->HGetallWithTTL(key, fvs, ttl_millsec);
 }
 
 Status Storage::HKeys(const Slice& key, std::vector<std::string>* fields) {
@@ -626,9 +636,9 @@ Status Storage::SMembers(const Slice& key, std::vector<std::string>* members) {
   return inst->SMembers(key, members);
 }
 
-Status Storage::SMembersWithTTL(const Slice& key, std::vector<std::string>* members, int64_t *ttl) {
+Status Storage::SMembersWithTTL(const Slice& key, std::vector<std::string>* members, int64_t * ttl_millsec) {
   auto& inst = GetDBInstance(key);
-  return inst->SMembersWithTTL(key, members, ttl);
+  return inst->SMembersWithTTL(key, members, ttl_millsec);
 }
 
 Status Storage::SMove(const Slice& source, const Slice& destination, const Slice& member, int32_t* ret) {
@@ -753,9 +763,9 @@ Status Storage::LRange(const Slice& key, int64_t start, int64_t stop, std::vecto
   return inst->LRange(key, start, stop, ret);
 }
 
-Status Storage::LRangeWithTTL(const Slice& key, int64_t start, int64_t stop, std::vector<std::string>* ret, int64_t *ttl) {
+Status Storage::LRangeWithTTL(const Slice& key, int64_t start, int64_t stop, std::vector<std::string>* ret, int64_t * ttl_millsec) {
   auto& inst = GetDBInstance(key);
-  return inst->LRangeWithTTL(key, start, stop, ret, ttl);
+  return inst->LRangeWithTTL(key, start, stop, ret, ttl_millsec);
 }
 
 Status Storage::LTrim(const Slice& key, int64_t start, int64_t stop) {
@@ -885,10 +895,10 @@ Status Storage::ZRange(const Slice& key, int32_t start, int32_t stop, std::vecto
   return inst->ZRange(key, start, stop, score_members);
 }
 Status Storage::ZRangeWithTTL(const Slice& key, int32_t start, int32_t stop, std::vector<ScoreMember>* score_members,
-                                 int64_t *ttl) {
+                                 int64_t * ttl_millsec) {
   score_members->clear();
   auto& inst = GetDBInstance(key);
-  return inst->ZRangeWithTTL(key, start, stop, score_members, ttl);
+  return inst->ZRangeWithTTL(key, start, stop, score_members, ttl_millsec);
 }
 
 Status Storage::ZRangebyscore(const Slice& key, double min, double max, bool left_close, bool right_close,
@@ -1170,10 +1180,10 @@ Status Storage::XInfo(const Slice& key, StreamInfoResult &result) {
 }
 
 // Keys Commands
-int32_t Storage::Expire(const Slice& key, int64_t ttl) {
+int32_t Storage::Expire(const Slice& key, int64_t ttl_millsec) {
   auto& inst = GetDBInstance(key);
   int32_t ret = 0;
-  Status s = inst->Expire(key, ttl);
+  Status s = inst->Expire(key, ttl_millsec);
   if (s.ok()) {
     ret++;
   } else if (!s.IsNotFound()) {
@@ -1449,11 +1459,11 @@ Status Storage::Scanx(const DataType& data_type, const std::string& start_key, c
   return Status::OK();
 }
 
-int32_t Storage::Expireat(const Slice& key, int64_t timestamp) {
+int32_t Storage::Expireat(const Slice& key, int64_t timestamp_millsec) {
   Status s;
   int32_t count = 0;
   auto& inst = GetDBInstance(key);
-  s = inst->Expireat(key, timestamp);
+  s = inst->Expireat(key, timestamp_millsec);
   if (s.ok()) {
     count++;
   } else if (!s.IsNotFound()) {
@@ -1474,16 +1484,28 @@ int32_t Storage::Persist(const Slice& key) {
   return count;
 }
 
-int64_t Storage::TTL(const Slice& key) {
-  int64_t timestamp = 0;
+int64_t Storage::PTTL(const Slice& key) {
+  int64_t ttl_millsec = 0;
   auto& inst = GetDBInstance(key);
-  Status s = inst->TTL(key, &timestamp);
+  Status s = inst->TTL(key, &ttl_millsec);
   if (s.ok() || s.IsNotFound()) {
-    return timestamp;
+    return ttl_millsec;
   } else if (!s.IsNotFound()) {
     return -3;
   }
-  return timestamp;
+  return ttl_millsec;
+}
+
+int64_t Storage::TTL(const Slice& key) {
+  int64_t ttl_millsec = 0;
+  auto& inst = GetDBInstance(key);
+  Status s = inst->TTL(key, &ttl_millsec);
+  if (s.ok() || s.IsNotFound()) {
+    return ttl_millsec > 0 ? ttl_millsec / 1000 : ttl_millsec;
+  } else if (!s.IsNotFound()) {
+    return -3;
+  }
+  return ttl_millsec > 0 ? ttl_millsec / 1000 : ttl_millsec;
 }
 
 Status Storage::GetType(const std::string& key, enum DataType& type) {
@@ -1705,6 +1727,8 @@ Status Storage::RunBGTask() {
 
     if (task.operation == kCleanAll) {
       DoCompactRange(task.type, "", "");
+    } else if (task.operation == kCompactOldestOrBestDeleteRatioSst) {
+      LongestNotCompactionSstCompact(task.type, true);
     } else if (task.operation == kCompactRange) {
       if (task.argv.size() == 1) {
         DoCompactSpecificKey(task.type, task.argv[0]);
@@ -1713,6 +1737,25 @@ Status Storage::RunBGTask() {
         DoCompactRange(task.type, task.argv.front(), task.argv.back());
       }
     }
+  }
+  return Status::OK();
+}
+
+Status Storage::LongestNotCompactionSstCompact(const DataType &type, bool sync) {
+  if (sync) {
+    Status s;
+    for (const auto& inst : insts_) {
+      std::vector<rocksdb::Status> compact_result_vec;
+      s = inst->LongestNotCompactionSstCompact(type, &compact_result_vec);
+      for (auto compact_result : compact_result_vec) {
+        if (!compact_result.ok()) {
+          LOG(ERROR) << compact_result.ToString();
+        }
+      }
+    }
+    return s;
+  } else {
+    AddBGTask({type, kCompactOldestOrBestDeleteRatioSst});
   }
   return Status::OK();
 }
@@ -1744,6 +1787,9 @@ Status Storage::DoCompactRange(const DataType& type, const std::string& start, c
   for (const auto& inst : insts_) {
     current_task_type_ = Operation::kCleanAll;
     s = inst->CompactRange(start_ptr, end_ptr);
+    if (!s.ok()) {
+      LOG(ERROR) << "DoCompactRange error: " << s.ToString();
+    }
   }
   current_task_type_ = Operation::kNone;
   return s;
@@ -1779,7 +1825,7 @@ Status Storage::SetMaxCacheStatisticKeys(uint32_t max_cache_statistic_keys) {
 }
 
 Status Storage::SetSmallCompactionThreshold(uint32_t small_compaction_threshold) {
-  for (const auto& inst: insts_) {
+  for (const auto& inst : insts_) {
     inst->SetSmallCompactionThreshold(small_compaction_threshold);
   }
   return Status::OK();
@@ -1931,6 +1977,10 @@ void Storage::GetRocksDBInfo(std::string& info) {
     snprintf(temp, sizeof(temp), "instance%d_", inst->GetIndex());
     inst->GetRocksDBInfo(info, temp);
   }
+}
+
+const StorageOptions& Storage::GetStorageOptions() {
+  return storage_options_;
 }
 
 int64_t Storage::IsExist(const Slice& key, std::map<DataType, Status>* type_status) {

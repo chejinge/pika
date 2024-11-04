@@ -1,3 +1,66 @@
+# V4.0.1
+
+## New Features
+
+- Added a switch for the RTC function. If `Get`/`HGet` misses the cache on the RTC path, when it moves to the normal path, it directly reads from the DB without reading from the cache [#2841](https://github.com/OpenAtomFoundation/pika/pull/2841) @[cheniujh](https://github.com/cheniujh)
+
+- Optimized the Pika access cache with the RTC model to improve read performance of the Pika service [#2837](https://github.com/OpenAtomFoundation/pika/pull/2837) @[cheniujh](https://github.com/cheniujh)
+
+- Added a scheduled task for log deletion, set to delete logs every 7 days by default. This can be configured in the config file based on your needs [#2829](https://github.com/OpenAtomFoundation/pika/pull/2829) @[XiaoLiang2333](https://github.com/XiaoLiang2333)
+
+## Improvement
+
+- Added a data cleaning function to facilitate users in cleaning data during upgrades [#2888](https://github.com/OpenAtomFoundation/pika/pull/2888) @[QlQlqiqi](https://github.com/QlQlqiqi)
+
+- Changed the value in Floyd’s stored `data` field to milliseconds to be compatible with Redis commands [#2857](https://github.com/OpenAtomFoundation/pika/pull/2857) @[luky116](https://github.com/luky116)
+
+- The `flushall` command now writes `flushdb` to the binlog. If in multi-DB mode, a separate log is written for each DB to ensure correct consumption order by replica nodes [#2846](https://github.com/OpenAtomFoundation/pika/pull/2846) @[cheniujh](https://github.com/cheniujh)
+
+- Removed unnecessary logs to avoid excessive disk usage, which could impact data read/write operations [#2840](https://github.com/OpenAtomFoundation/pika/pull/2840) @[chejinge](https://github.com/chejinge)
+
+- The `incr` and `append` commands use `pksetexat` when transferring binlog to prevent incorrect operations that could cause data expiration issues, leading to dirty data [#2833](https://github.com/OpenAtomFoundation/pika/pull/2833) @[chejinge](https://github.com/chejinge)
+
+- Modified the Pika replica node binlog consumption thread model to ensure the consumption order of `binlog` [#2708](https://github.com/OpenAtomFoundation/pika/pull/2708) @[cheniujh](https://github.com/cheniujh)
+
+- Added more RocksDB metrics by introducing the `open_rocksdb_statistics_tickers` field in the configuration. By default, it's set to `no`, but turning it on will incur an additional 1.5% performance cost [#2658](https://github.com/OpenAtomFoundation/pika/pull/2658) @[baixin01](https://github.com/baixin01)
+
+## Bugfix
+
+- Fixed inaccurate cache data usage by Pika, which caused incorrect monitoring results [#2899](https://github.com/OpenAtomFoundation/pika/pull/2899) @[chejinge](https://github.com/chejinge)
+
+- Fixed the issue where an exception error signal from the `zremrangebyrank` command could cause Pika to crash [#2891](https://github.com/OpenAtomFoundation/pika/pull/2891) @[chejinge](https://github.com/chejinge)
+
+- Fixed the issue where the `Rpushx` command did not update RedisCache, leading to DB and cache inconsistency [#2879](https://github.com/OpenAtomFoundation/pika/pull/2879) @[hahahashen](https://github.com/hahahashen)
+
+- Fixed the incorrect connection termination process in the `kill client` command [#2862](https://github.com/OpenAtomFoundation/pika/pull/2862) @[cheniujh](https://github.com/cheniujh)
+
+- Fixed the issue where `blpop`/`brpop` did not update the cache when updating the DB, potentially causing inconsistency between RocksDB and RedisCache [#2858](https://github.com/OpenAtomFoundation/pika/pull/2858) @[cheniujh](https://github.com/cheniujh)
+
+- Fixed the issue where Pika did not support Redis-Sentinel [#2854](https://github.com/OpenAtomFoundation/pika/pull/2854) @[cheniujh](https://github.com/cheniujh)
+
+- Fixed inconsistent results when executing the `hincrby` command multiple times [#2836](https://github.com/OpenAtomFoundation/pika/pull/2836) @[luky116](https://github.com/luky116)
+
+- Replaced CentOS with Rocky as the default environment for GitHub CI. The process now supports MacOS/Ubuntu/Rocky [#2823](https://github.com/OpenAtomFoundation/pika/pull/2823) @[QlQlqiqi](https://github.com/QlQlqiqi)
+
+- Modified the `client watch` mechanism, where keys will become invalid if modified by anyone (including the client itself) [#2815](https://github.com/OpenAtomFoundation/pika/pull/2815) @[luky116](https://github.com/luky116)
+
+- Resolved inaccurate `slave_priority` assignment in Pika, which could cause the replica node to fail to promote to master, preventing the use of Redis-Sentinel [#2813](https://github.com/OpenAtomFoundation/pika/pull/2813) @[chejinge](https://github.com/chejinge)
+
+- Transaction commands now update both DB and RedisCache to avoid inconsistencies between the two [#2812](https://github.com/OpenAtomFoundation/pika/pull/2812) @[luky116](https://github.com/luky116)
+
+- Optimized master-slave replication to ensure that the SlaveNode on the master enters DBSync state before submitting the `bgsave` task, preventing binlog deletion during extreme cases while `bgsave` is being executed [#2798](https://github.com/OpenAtomFoundation/pika/pull/2798) @[cheniujh](https://github.com/cheniujh)
+
+- Modified the binlog handling logic during master-slave replication to ensure sequential execution and prevent inconsistencies between master and replica [#2794](https://github.com/OpenAtomFoundation/pika/pull/2794) @[cheniujh](https://github.com/cheniujh)
+
+- Fixed inaccurate BlockCache calculations [#2797](https://github.com/OpenAtomFoundation/pika/pull/2797) @[bigdaronlee163](https://github.com/bigdaronlee163)
+
+- Added flag bits, timestamps, and return value mechanisms to ensure Pika correctly handles conflicts when executing `flushdb` while processing asynchronous deletion of old directories [#2790](https://github.com/OpenAtomFoundation/pika/pull/2790) @[cheniujh](https://github.com/cheniujh)
+
+- Fixed the issue where inconsistent data amounts between master and replica during Redis-Sentinel failover could cause the state transition to error [#2766](https://github.com/OpenAtomFoundation/pika/pull/2766) @[cheniujh](https://github.com/cheniujh)
+
+- Fixed the issue where multiple replica instance expansions could cause full replication to fail [#2756](https://github.com/OpenAtomFoundation/pika/pull/2756) @[cheniujh](https://github.com/cheniujh)
+
+
 # v3.5.5
 
 ## New Features
@@ -44,13 +107,15 @@
 
 - Fixed an incorrect process in the kill client command for terminating connections [#2862](https://github.com/OpenAtomFoundation/pika/pull/2862)@[cheniujh](https://github.com/cheniujh)
 
-- Fix an issue where blpop/brpop would not update the cache when updating the database, which could cause inconsistencies between the database and the cache[#2858](https://github.com/OpenAtomFoundation/pika/pull/2858)@[cheniujh](https://github.com/cheniujh)
+- Fix an issue where blpop/brpop would not update the RedisCache when updating the database, which could cause inconsistencies between the RocksDB and the RedisCache [#2858](https://github.com/OpenAtomFoundation/pika/pull/2858)@[cheniujh](https://github.com/cheniujh)
 
 - Fixed an issue where Pika did not support Redis-Sentinel.[#2854](https://github.com/OpenAtomFoundation/pika/pull/2854)@[cheniujh](https://github.com/cheniujh)
 
 - Modify the flushall logic to avoid multiple data cleanups during unified processing[#2846](https://github.com/OpenAtomFoundation/pika/pull/2846)@[cheniujh](https://github.com/cheniujh)
 
-- The PkPatternMatchDel command now deletes cache entries along with the database entries, preventing inconsistencies between the database and cache. [#2839](https://github.com/OpenAtomFoundation/pika/pull/2839)@[chejinge](https://github.com/chejinge)
+- The GitHub CI (Continuous Integration) workflow will support three environments overall: macOS, Ubuntu, and Rocky[#2823](https://github.com/OpenAtomFoundation/pika/pull/2823)@[QlQlqiqi](https://github.com/QlQlqiqi)
+
+- The PkPatternMatchDel command now deletes RedisCache entries along with the database entries, preventing inconsistencies between the RocksDB and the RedisCache. [#2839](https://github.com/OpenAtomFoundation/pika/pull/2839)@[chejinge](https://github.com/chejinge)
 
 - Optimize the scope of read locks to avoid inconsistencies between master and slave data due to repeated binlog consumption #2818 by[#2818](https://github.com/OpenAtomFoundation/pika/pull/2818)@[cheniujh](https://github.com/cheniujh)
 
@@ -78,9 +143,11 @@
 
 - Fix an issue where the min-blob-size parameter would fail to parse, causing errors in KV separation[#2767](https://github.com/OpenAtomFoundation/pika/pull/2767)@[wangshao1](https://github.com/wangshao1)
 
+- Fix the issue of incorrect state reversal during sentinel master-slave switch caused by data inconsistency between the master and slave nodes [#2766](https://github.com/OpenAtomFoundation/pika/pull/2766) @[cheniujh](https://github.com/cheniujh)
+
 - Fix an issue where the Zverank command would calculate incorrectly, leading to erroneous return values[#2763](https://github.com/OpenAtomFoundation/pika/pull/2763)@[chejinge](https://github.com/chejinge)
 
-- Fix an issue where the Pksetat command did not update the cache while updating the database, which could cause inconsistencies between the database and the cache[#2759](https://github.com/OpenAtomFoundation/pika/pull/2759)@[chejinge](https://github.com/chejinge)
+- Fix an issue where the Pksetat command did not update the RedisCache while updating the database, which could cause inconsistencies between the RocksDB and the RedisCache.[#2759](https://github.com/OpenAtomFoundation/pika/pull/2759)@[chejinge](https://github.com/chejinge)
 
 - Fixed an error occurring during data migration with Pika-port.[#2758](https://github.com/OpenAtomFoundation/pika/pull/2758)@[guangkun123](https://github.com/guangkun123)
 
@@ -92,7 +159,10 @@
 
 - Fix an issue where incorrect return values from the SlotMigrate command could interrupt data migration[#2741](https://github.com/OpenAtomFoundation/pika/pull/2741)@[wangshao1](https://github.com/wangshao1)
 
-- Fix an issue where the RedisCache layer could cause inconsistencies between the database and the cache due to not using the TTL parsed by the storage layer[#2729](https://github.com/OpenAtomFoundation/pika/pull/2729)@[luky116](https://github.com/luky116)
+- Pksetexat updates the RedisCache while updating the database to avoid inconsistencies between the RocksDB and the RedisCache.[#2736](https://github.com/OpenAtomFoundation/pika/pull/2736) @[longfar-ncy](https://github.com/longfar-ncy)
+
+- Fix an issue where the RedisCache layer could cause inconsistencies between
+  the RocksDB and the RedisCache due to not using the TTL parsed by the storage layer[#2729](https://github.com/OpenAtomFoundation/pika/pull/2729)@[luky116](https://github.com/luky116)
 
 - Fix an issue where Stream-type data could not be compacted by RocksDB, causing expired data to persist[#2724](https://github.com/OpenAtomFoundation/pika/pull/2724)@[wangshao1](https://github.com/wangshao1)
 

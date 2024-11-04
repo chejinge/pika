@@ -1070,6 +1070,8 @@ void InfoCmd::InfoStats(std::string& info) {
   tmp_stream << "total_connections_received:" << g_pika_server->accumulative_connections() << "\r\n";
   tmp_stream << "instantaneous_ops_per_sec:" << g_pika_server->ServerCurrentQps() << "\r\n";
   tmp_stream << "total_commands_processed:" << g_pika_server->ServerQueryNum() << "\r\n";
+  tmp_stream << "keyspace_hits:" << g_pika_server->ServerKeyspaceHits() << "\r\n";
+  tmp_stream << "keyspace_misses:" << g_pika_server->ServerKeyspaceMisses() << "\r\n";
 
   // Network stats
   tmp_stream << "total_net_input_bytes:" << g_pika_server->NetInputBytes() + g_pika_server->NetReplInputBytes()
@@ -1366,12 +1368,8 @@ void InfoCmd::InfoData(std::string& info) {
   uint64_t total_background_errors = 0;
   uint64_t total_memtable_usage = 0;
   uint64_t total_table_reader_usage = 0;
-  uint64_t total_redis_cache_usage = 0;
-  uint64_t total_block_cache_usage = 0;
   uint64_t memtable_usage = 0;
   uint64_t table_reader_usage = 0;
-  uint64_t redis_cache_usage  = 0;
-  uint64_t block_cache_usage = 0;
   std::shared_lock db_rwl(g_pika_server->dbs_rw_);
   for (const auto& db_item : g_pika_server->dbs_) {
     if (!db_item.second) {
@@ -1382,14 +1380,10 @@ void InfoCmd::InfoData(std::string& info) {
     db_item.second->DBLockShared();
     db_item.second->storage()->GetUsage(storage::PROPERTY_TYPE_ROCKSDB_CUR_SIZE_ALL_MEM_TABLES, &memtable_usage);
     db_item.second->storage()->GetUsage(storage::PROPERTY_TYPE_ROCKSDB_ESTIMATE_TABLE_READER_MEM, &table_reader_usage);
-    db_item.second->storage()->GetUsage(storage::PROPERTY_TYPE_ROCKSDB_BlOCK_CACHE_USAGE, &block_cache_usage);
     db_item.second->storage()->GetUsage(storage::PROPERTY_TYPE_ROCKSDB_BACKGROUND_ERRORS, &background_errors);
-    redis_cache_usage = db_item.second->GetCacheInfo().used_memory;
     db_item.second->DBUnlockShared();
     total_memtable_usage += memtable_usage;
     total_table_reader_usage += table_reader_usage;
-    total_block_cache_usage += block_cache_usage;
-    total_redis_cache_usage += redis_cache_usage;
     for (const auto& item : background_errors) {
       if (item.second != 0) {
         db_fatal_msg_stream << (total_background_errors != 0 ? "," : "");
@@ -1399,12 +1393,11 @@ void InfoCmd::InfoData(std::string& info) {
     }
   }
 
-  tmp_stream << "used_memory:" << (total_memtable_usage + total_table_reader_usage + total_redis_cache_usage + total_block_cache_usage) << "\r\n";
-  tmp_stream << "used_memory_human:" << ((total_memtable_usage + total_table_reader_usage + total_redis_cache_usage + total_block_cache_usage) >> 20) << "M\r\n";
+  tmp_stream << "used_memory:" << (total_memtable_usage + total_table_reader_usage) << "\r\n";
+  tmp_stream << "used_memory_human:" << ((total_memtable_usage + total_table_reader_usage) >> 20) << "M\r\n";
+
   tmp_stream << "db_memtable_usage:" << total_memtable_usage << "\r\n";
   tmp_stream << "db_tablereader_usage:" << total_table_reader_usage << "\r\n";
-  tmp_stream << "db_block_cache_usage:" << total_block_cache_usage << "\r\n";
-  tmp_stream << "db_redis_cache_usage:" << total_redis_cache_usage << "\r\n";
   tmp_stream << "db_fatal:" << (total_background_errors != 0 ? "1" : "0") << "\r\n";
   tmp_stream << "db_fatal_msg:" << (total_background_errors != 0 ? db_fatal_msg_stream.str() : "nullptr") << "\r\n";
 
@@ -2841,8 +2834,8 @@ void ConfigCmd::ConfigSet(std::shared_ptr<DB> db) {
                    "The rsync rate limit now is "
                 << new_throughput_limit << "(Which Is Around " << (new_throughput_limit >> 20) << " MB/s)";
     res_.AppendStringRaw("+OK\r\n");
-  } else if(set_item == "rsync-timeout-ms"){
-    if(pstd::string2int(value.data(), value.size(), &ival) == 0 || ival <= 0){
+  } else if (set_item == "rsync-timeout-ms") {
+    if (pstd::string2int(value.data(), value.size(), &ival) == 0 || ival <= 0) {
       res_.AppendStringRaw("-ERR Invalid argument \'" + value + "\' for CONFIG SET 'rsync-timeout-ms'\r\n");
       return;
     }
@@ -3037,9 +3030,9 @@ void DbsizeCmd::Do() {
   if (!dbs) {
     res_.SetRes(CmdRes::kInvalidDB);
   } else {
-    if (g_pika_conf->slotmigrate()){
+    if (g_pika_conf->slotmigrate()) {
       int64_t dbsize = 0;
-      for (int i = 0; i < g_pika_conf->default_slot_num(); ++i){
+      for (int i = 0; i < g_pika_conf->default_slot_num(); ++i) {
         int32_t card = 0;
         rocksdb::Status s = dbs->storage()->SCard(SlotKeyPrefix+std::to_string(i), &card);
         if (s.ok() && card >= 0) {

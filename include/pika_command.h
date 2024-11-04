@@ -332,13 +332,15 @@ class CmdRes {
     kInvalidTransaction,
     kTxnQueued,
     kTxnAbort,
-    kMultiKey
+    kMultiKey,
+    kNoExists,
   };
 
   CmdRes() = default;
 
   bool none() const { return ret_ == kNone && message_.empty(); }
-  bool ok() const { return ret_ == kOk || ret_ == kNone; }
+  bool noexist() const { return ret_ == kNoExists; }
+  bool ok() const { return ret_ == kOk || ret_ == kNone || ret_ == kNoExists; }
   CmdRet ret() const { return ret_; }
   void clear() {
     message_.clear();
@@ -365,7 +367,6 @@ class CmdRes {
         return "-ERR bit offset is not an integer or out of range\r\n";
       case kWrongBitOpNotNum:
         return "-ERR BITOP NOT must be called with a single source key.\r\n";
-
       case kInvalidBitPosArgument:
         return "-ERR The bit argument must be 1 or 0.\r\n";
       case kInvalidFloat:
@@ -431,6 +432,8 @@ class CmdRes {
         result = "-WRONGTYPE Operation against a key holding the wrong kind of value";
         result.append(kNewLine);
         break;
+      case kNoExists:
+        return message_;
       default:
         break;
     }
@@ -529,6 +532,7 @@ class Cmd : public std::enable_shared_from_this<Cmd> {
   // used for execute multikey command into different slots
   virtual void Split(const HintKeys& hint_keys) = 0;
   virtual void Merge() = 0;
+  virtual bool IsTooLargeKey(const int &max_sz) { return false; }
 
   int8_t SubCmdIndex(const std::string& cmdName);  // if the command no subCommand，return -1；
 
@@ -541,7 +545,7 @@ class Cmd : public std::enable_shared_from_this<Cmd> {
 
   bool IsLocal() const;
   bool IsSuspend() const;
-  bool IsAdminRequire() const;
+  bool IsAdmin() const;
   bool HasSubCommand() const;                   // The command is there a sub command
   std::vector<std::string> SubCommand() const;  // Get command is there a sub command
   bool IsNeedUpdateCache() const;

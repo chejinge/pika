@@ -507,8 +507,7 @@ void InitCmdTable(CmdTable* cmd_table) {
       std::make_unique<RPushCmd>(kCmdNameRPush, -3, kCmdFlagsWrite | kCmdFlagsList | kCmdFlagsDoThroughDB | kCmdFlagsUpdateCache | kCmdFlagsFast);
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameRPush, std::move(rpushptr)));
   std::unique_ptr<Cmd> rpushxptr =
-      std::make_unique<RPushxCmd>(kCmdNameRPushx, -3, kCmdFlagsWrite |  kCmdFlagsList);
-  std::make_unique<RPushxCmd>(kCmdNameRPushx, 3, kCmdFlagsWrite |  kCmdFlagsList | kCmdFlagsDoThroughDB | kCmdFlagsUpdateCache | kCmdFlagsFast);
+      std::make_unique<RPushxCmd>(kCmdNameRPushx, -3, kCmdFlagsWrite |  kCmdFlagsList | kCmdFlagsDoThroughDB | kCmdFlagsUpdateCache | kCmdFlagsFast);
   cmd_table->insert(std::pair<std::string, std::unique_ptr<Cmd>>(kCmdNameRPushx, std::move(rpushxptr)));
 
   // Zset
@@ -911,6 +910,13 @@ void Cmd::DoCommand(const HintKeys& hint_keys) {
   } else {
     Do();
   }
+  if (!IsAdmin() && res().ok()) {
+    if (res().noexist()) {
+      g_pika_server->incr_server_keyspace_misses();
+    } else {
+      g_pika_server->incr_server_keyspace_hits();
+    }
+  }
 }
 
 bool Cmd::DoReadCommandInCache() {
@@ -984,7 +990,7 @@ bool Cmd::IsSuspend() const { return (flag_ & kCmdFlagsSuspend); }
 // std::string Cmd::CurrentSubCommand() const { return ""; };
 bool Cmd::HasSubCommand() const { return subCmdName_.size() > 0; };
 std::vector<std::string> Cmd::SubCommand() const { return subCmdName_; };
-bool Cmd::IsAdminRequire() const { return (flag_ & kCmdFlagsAdminRequire); }
+bool Cmd::IsAdmin() const { return (flag_ & kCmdFlagsAdmin); }
 bool Cmd::IsNeedUpdateCache() const { return (flag_ & kCmdFlagsUpdateCache); }
 bool Cmd::IsNeedCacheDo() const {
   if (g_pika_conf->IsCacheDisabledTemporarily()) {
