@@ -32,7 +32,7 @@ sleep 10
 pwd
 echo "$(pwd)"
 
-cd ../codis
+cd ../../codis
 make
 
 echo 'startup codis dashboard and codis proxy'
