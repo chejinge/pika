@@ -31,18 +31,6 @@ jobs:
         with:
           key: ubuntu-latest
 
-      - name: Uninstall Existing zlib
-        run: |
-          # Uninstall existing zlib to avoid conflicts
-          brew uninstall --ignore-dependencies zlib || true
-
-      - name: Reinstall New zlib
-        run: |
-          # Install new zlib version
-          brew install zlib
-          # Verify installation and path
-          brew link --force zlib
-
       - name: Install Deps
         run: |
           sudo apt-get update
@@ -183,6 +171,18 @@ jobs:
         uses: hendrikmuhs/ccache-action@v1.2.13
         with:
           key: macos-13
+
+      - name: Uninstall Existing zlib
+        run: |
+          # Uninstall existing zlib to avoid conflicts
+          brew uninstall --ignore-dependencies zlib || true
+
+      - name: Reinstall New zlib
+        run: |
+          # Install new zlib version
+          brew install zlib
+          # Verify installation and path
+          brew link --force zlib
 
       - name: Install Deps
         run: |
