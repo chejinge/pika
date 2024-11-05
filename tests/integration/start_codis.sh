@@ -29,6 +29,8 @@ sed -i '' -e 's|databases : 1|databases : 2|' -e 's|port : 9221|port : 8001|' -e
 #ensure both master and slave are ready
 sleep 10
 
+pwd
+
 cd ../codis
 make
 
