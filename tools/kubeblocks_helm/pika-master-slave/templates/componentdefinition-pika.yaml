@@ -50,6 +50,8 @@ spec:
              done
         preCondition: ComponentReady
   runtime:
+    nodeSelector:
+      group: pika
     initContainers:
       - name: init-config
         image: busybox:1.28

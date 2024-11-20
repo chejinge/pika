@@ -33,8 +33,9 @@ resources:
 persistence:
   enabled: true
   pikaData:
-    storageClassName:
+    storageClassName: open-local-lvm
     size: 10Gi
+    volumeMode: Filesystem
 
 topologyKeys:
   - kubernetes.io/hostname
