@@ -1,0 +1,61 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+
+kind: Cluster
+
+metadata:
+
+  name: pika-group-restore
+
+  namespace: default
+
+  annotations:
+
+    kubeblocks.io/restore-from-backup: '{"redis":{"connectionPassword":"<backup-connection-password>","name":"redis-cluster-backup","namespace":"default","volumeRestorePolicy":"Parallel"}}'
+
+spec:
+
+  clusterDefinitionRef: pika
+
+  topology: replication
+
+  terminationPolicy: Delete
+
+  componentSpecs:
+    - name: pika
+      disableExporter: true
+      enabledLogs:
+        - running
+      serviceAccountName: kb-pika-group
+      replicas: 3
+      resources:
+        limits:
+          cpu: '1'
+          memory: 1Gi
+        requests:
+          cpu: '1'
+          memory: 1Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 30Gi
+    - name: redis-sentinel
+      replicas: 3
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

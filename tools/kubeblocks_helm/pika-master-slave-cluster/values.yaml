@@ -24,17 +24,17 @@ resources:
   # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
   pikaMS:
     limits:
-      cpu: 500m
-      memory: 3Gi
+      cpu: 8000m
+      memory: 10Gi
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 8000m
+      memory: 10Gi
 
 persistence:
   enabled: true
   pikaData:
     storageClassName:
-    size: 10Gi
+    size: 100Gi
 
 topologyKeys:
   - kubernetes.io/hostname
