@@ -44,6 +44,43 @@ topologyKeys:
 ##
 tolerations: [ ]
 
+# Exporter Configurations
+exporter:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: oliver006/redis_exporter
+    tag: v1.49.0
+    pullPolicy: IfNotPresent
+  port: 9121
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Sentinel Configurations
+sentinel:
+  enabled: true
+  replicas: 3
+  image:
+    registry: docker.io
+    repository: redis
+    tag: 7.2
+    pullPolicy: IfNotPresent
+  port: 26379
+  quorum: 2
+  masterName: "pika-master"
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
 #enabledLogs:
 #  - running
 

@@ -1,21 +1,14 @@
-apiVersion: redis.redis.opstreelabs.in/v1beta1
-kind: RedisSentinel
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ComponentVersion
 metadata:
-  name: redis-sentinel
+  name: redis-sentinel-v7.0.7
 spec:
-  clusterSize: 3
-  podSecurityContext:
-    runAsUser: 1000
-    fsGroup: 1000
-  redisSentinelConfig:
-    redisReplicationName: redis-replication
-  kubernetesConfig:
-    image: 'quay.io/opstree/redis-sentinel:v7.0.7'
-    imagePullPolicy: IfNotPresent
-    resources:
-      requests:
-        cpu: 101m
-        memory: 128Mi
-      limits:
-        cpu: 101m
-        memory: 128Mi
+  compatibilityRules:
+    - compDefs:
+        - redis-sentinel
+  releases:
+    - name: "v7.0.7"
+      changes: "Initial version with Redis Sentinel v7.0.7"
+      serviceVersion: "v7.0.7"
+      images:
+        redis-sentinel: quay.io/opstree/redis-sentinel:v7.0.7

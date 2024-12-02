@@ -11,55 +11,43 @@ spec:
   serviceKind: pika-exporter
   serviceVersion: {{ .Chart.AppVersion }}
   services:
-    - name: expoter
+    - name: exporter
       spec:
         ports:
-          - name: expoter
+          - name: exporter
             port: 9121
-            targetPort: expoter
+            targetPort: exporter
   updateStrategy: Serial
   configs:
     - name: pika-config
       templateRef: pika-conf-template
       namespace: {{ .Release.Namespace }}
       volumeName: config
-  vars:
-    ## reference to the pika-codis-dashboard service
-    - name: DASHBOARD_ADDR
-      valueFrom:
-        serviceVarRef:
-          compDef: pika-codis-dashboard
-          name: dashboard
-          optional: true
-          host: Optional
   runtime:
     initContainers:
-      - name: wait-codis-dashboard
-        env:
-          - name: DASHBOARD_ADDR
-            value: "$(KB_CLUSTER_NAME)-codis-dashboard"
+      - name: wait-pika
         image: busybox:1.28
         command:
           - 'sh'
           - '-c'
-          - "until nc -z ${DASHBOARD_ADDR} 18080; do echo waiting for codis dashboard; sleep 2; done;"
+          - "until nc -z pika-master 9221; do echo waiting for pika master; sleep 2; done;"
     containers:
       - name: pika-exporter
         image: {{ include "pikaExporter.image" . }}
         imagePullPolicy: {{ include "pikaExporter.imagePullPolicy" . }}
         ports:
-          - name: expoter
+          - name: exporter
             containerPort: 9121
         volumeMounts:
           - name: config
             mountPath: /etc/pika
         env:
-          - name: DASHBOARD_ADDR
-            value: "$(KB_CLUSTER_NAME)-codis-dashboard"
+          - name: PIKA_ADDR
+            value: "pika-master:9221"
         command:
           - "/pika/bin/pika_exporter"
         args:
           - "-config"
           - "/etc/pika/info.toml"
-          - "-codis.addr"
-          - "http://$(DASHBOARD_ADDR):18080/topom"
+          - "-pika.addr"
+          - "$(PIKA_ADDR)"

@@ -14,6 +14,6 @@ items:
       app: {{ template "pika.name" $ }}-grafana
 {{ include "pika.labels" $ | indent 6 }}
   data:
-    {{ $dashboardName }}.json: {{ $.Files.Get $path | toJson }}
+    {{ $dashboardName }}.json: "{{ $.Files.Get $path | toJson }}"
 {{- end }}
 {{- end }}

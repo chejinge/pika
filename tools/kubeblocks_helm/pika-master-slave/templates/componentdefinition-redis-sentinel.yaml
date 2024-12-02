@@ -6,45 +6,78 @@ metadata:
   labels:
     {{- include "pika.labels" . | nindent 4 }}
 spec:
-  clusterSize: 3
-  podSecurityContext:
-    runAsUser: 1000
-    fsGroup: 1000
-  redisSentinelConfig:
-    redisReplicationName: redis-replication
-  kubernetesConfig:
-    image: 'quay.io/opstree/redis-sentinel:v7.0.7'
-    imagePullPolicy: IfNotPresent
-    resources:
-      requests:
-        cpu: 101m
-        memory: 128Mi
-      limits:
-        cpu: 101m
-        memory: 128Mi
+  provider: redis
+  description: Redis Sentinel component definition
+  serviceKind: redis-sentinel
+  serviceVersion: {{ .Chart.AppVersion }}
+  services:
+    - name: redis-sentinel
+      spec:
+        ports:
+          - name: sentinel
+            port: 26379
+            targetPort: sentinel
   updateStrategy: Serial
   configs:
-    - name: pika-config
-      templateRef: pika-conf-template
+    - name: sentinel-config
+      templateRef: redis-sentinel-conf-template
       namespace: {{ .Release.Namespace }}
       volumeName: config
-  containers:
-    - name: redis-sentinel
-      image: {{ include "pikaExporter.image" . }}
-      imagePullPolicy: {{ include "pikaExporter.imagePullPolicy" . }}
-      ports:
-        - name: expoter
-          containerPort: 9121
-      volumeMounts:
-        - name: config
-          mountPath: /etc/pika
-      env:
-        - name: DASHBOARD_ADDR
-          value: "$(KB_CLUSTER_NAME)-codis-dashboard"
-      command:
-        - "/pika/bin/pika_exporter"
-      args:
-        - "-config"
-        - "/etc/pika/info.toml"
-        - "-codis.addr"
-        - "http://$(DASHBOARD_ADDR):18080/topom"
+  volumes:
+    - name: data
+  lifecycleActions:
+    postProvision:
+      customHandler:
+        image: {{ include "redis.image" . }}
+        exec:
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # Read pod names from the environment variable
+              IFS=',' read -r -a pod_name_array <<< ${KB_CLUSTER_COMPONENT_POD_NAME_LIST}
+              master_pod="${pod_name_array[0]}"
+              for pod_name in "${pod_name_array[@]}"; do
+                if [ "$pod_name" != "$master_pod" ]; then
+                  echo "Configuring Sentinel to monitor master pod: $master_pod"
+                  redis-cli -h "${pod_name}.redis-sentinel-cluster-headless" -p 26379 sentinel monitor mymaster ${master_pod} 6379 2
+                fi
+              done
+        preCondition: ComponentReady
+  runtime:
+    initContainers:
+      - name: init-config
+        image: busybox:1.28
+        imagePullPolicy: IfNotPresent
+        command:
+          - /bin/sh
+          - -ec
+          - |
+            if [ ! -f "/data/sentinel.conf" ]; then cp /etc/redis/sentinel.conf /data/sentinel.conf; fi
+        volumeMounts:
+          - name: config
+            mountPath: /etc/redis
+          - name: data
+            mountPath: /data
+    containers:
+      - name: redis-sentinel
+        image: 'quay.io/opstree/redis-sentinel:v7.0.7'
+        imagePullPolicy: IfNotPresent
+        ports:
+          - name: sentinel
+            containerPort: 26379
+        volumeMounts:
+          - name: config
+            mountPath: /etc/redis
+          - name: data
+            mountPath: /data
+        env:
+          - name: KB_CLUSTER_COMPONENT_POD_NAME_LIST
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.annotations['kubeblocks.io/component-pods']
+        command:
+          - "/redis/sentinel"
+        args:
+          - "/data/sentinel.conf"
