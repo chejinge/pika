@@ -11,6 +11,11 @@ image:
     repository: redis
     tag: 7.2
     pullPolicy: IfNotPresent
+  pikaExporter:
+    registry: docker.io
+    repository: pikadb/pika-exporter
+    tag: 3.5.3
+    pullPolicy: IfNotPresent
 roleProbe:
   pika:
     failureThreshold: 2

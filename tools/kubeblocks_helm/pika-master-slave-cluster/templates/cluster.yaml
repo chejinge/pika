@@ -42,3 +42,16 @@ spec:
                 storage: {{ .size }}
         {{- end }}
       {{- end }}
+    - name: pika-exporter
+      componentDef: pika-exporter # ref componentDefinition name
+      monitor: {{ .Values.monitor.enabled | default false }}
+      replicas: 1
+      {{- with  .Values.resources.pikaExporter }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}

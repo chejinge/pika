@@ -29,6 +29,13 @@ resources:
     requests:
       cpu: 500m
       memory: 1Gi
+  pikaExporter:
+    limits:
+      cpu: 500m
+      memory: 3Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
 
 persistence:
   enabled: true
