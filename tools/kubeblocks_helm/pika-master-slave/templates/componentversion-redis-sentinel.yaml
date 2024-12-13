@@ -1,14 +1,18 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ComponentVersion
 metadata:
-  name: redis-sentinel-v7.0.7
+  name: redis-sentinel-pika
+  labels:
+    {{- include "pika.labels" . | nindent 4 }}
 spec:
   compatibilityRules:
     - compDefs:
         - redis-sentinel
+      releases:
+        - {{ .Chart.AppVersion }}
   releases:
-    - name: "v7.0.7"
-      changes: "Initial version with Redis Sentinel v7.0.7"
-      serviceVersion: "v7.0.7"
+    - name: {{ .Chart.AppVersion }}
+      changes:
+      serviceVersion: {{ .Chart.AppVersion }}
       images:
-        redis-sentinel: quay.io/opstree/redis-sentinel:v7.0.7
+        redis-sentinel: {{ include "redisSentinel.image" . }}

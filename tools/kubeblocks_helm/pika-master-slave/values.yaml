@@ -4,12 +4,22 @@ image:
   pika:
     registry: docker.io
     repository: pikadb/pika
-    tag: 3.5.3
+    tag: v3.5.5
     pullPolicy: IfNotPresent
   redis:
     registry: docker.io
     repository: redis
     tag: 7.2
+    pullPolicy: IfNotPresent
+  pikaExporter:
+    registry: docker.io
+    repository: pika-exporter
+    tag: v3.5.5
+    pullPolicy: IfNotPresent
+  redisSentinel:
+    registry: docker.io
+    repository: redis-sentinel
+    tag: v7.0.7
     pullPolicy: IfNotPresent
 roleProbe:
   pika:

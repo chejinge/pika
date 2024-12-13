@@ -68,3 +68,19 @@ Define image
 {{- define "redis.imagePullPolicy" -}}
 {{ .Values.image.pika.pullPolicy | default "IfNotPresent" }}
 {{- end }}
+
+{{- define "pikaExporter.image" -}}
+{{ .Values.image.pikaExporter.registry | default "docker.io" }}/{{ .Values.image.pikaExporter.repository }}:{{ .Values.image.pikaExporter.tag }}
+{{- end }}
+
+{{- define "pikaExporter.imagePullPolicy" -}}
+{{ .Values.image.pikaExporter.pullPolicy | default "IfNotPresent" }}
+{{- end }}
+
+{{- define "redisSentinel.image" -}}
+{{ .Values.image.redisSentinel.registry | default "docker.io" }}/{{ .Values.image.redisSentinel.repository }}:{{ .Values.image.redisSentinel.tag }}
+{{- end }}
+
+{{- define "redisSentinel.imagePullPolicy" -}}
+{{ .Values.image.redisSentinel.pullPolicy | default "IfNotPresent" }}
+{{- end }}

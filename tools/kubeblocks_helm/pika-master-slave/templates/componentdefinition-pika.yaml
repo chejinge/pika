@@ -52,7 +52,7 @@ spec:
   runtime:
     initContainers:
       - name: init-config
-        image: busybox:1.28
+        image: mirror.k8s.qihoo.net/docker.io/library/busybox:1.28
         imagePullPolicy: IfNotPresent
         command:
           - /bin/sh
