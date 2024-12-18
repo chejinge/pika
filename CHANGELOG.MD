@@ -2,7 +2,7 @@
 
 ## New features
 
-- After executing `slaveof no one` to remove the replication relationship with the master node, Pika rewrites the `slaveof` information into the configuration file using `config rewrite`. [#2973](https://github.com/OpenAtomFoundation/pika/pull/2973) @[cheniujh](https://github.com/cheniujh)
+- After the Pika slave instance executes slaveof no one to remove the replication relationship with the master node, the slaveof information is persisted into the configuration file. [#2973](https://github.com/OpenAtomFoundation/pika/pull/2973) @[cheniujh](https://github.com/cheniujh)
 
 - Added support for backup and recovery in master-slave mode for Pika-Operator. [#2968](https://github.com/OpenAtomFoundation/pika/pull/2968) @[buzhimingyonghu](https://github.com/buzhimingyonghu)
 
@@ -14,7 +14,7 @@
 
 - Pika-Operator now supports starting in master-slave mode. See the README document for more details. [#2903](https://github.com/OpenAtomFoundation/pika/pull/2903) @[XiaoLiang2333](https://github.com/XiaoLiang2333)
 
-- Added `keyspace_hits` and `keyspace_misses` metrics to Pika-Exporter, enabling users to monitor key hit rates. [#2579](https://github.com/OpenAtomFoundation/pika/pull/2579) @[chenbt](https://github.com/chenbt)
+- Added `keyspace_hits` and `keyspace_misses` metrics to `pika_exporter`, enabling users to monitor key hit rates. [#2579](https://github.com/OpenAtomFoundation/pika/pull/2579) @[chenbt](https://github.com/chenbt)
 
 - RedisCache now avoids storing large keys to prevent excessive memory usage or the eviction of frequently accessed hot keys, which could impact performance. [#2557](https://github.com/OpenAtomFoundation/pika/pull/2557) @[QlQlqiqi](https://github.com/QlQlqiqi)
 

@@ -2,7 +2,7 @@
 
 ## New features
 
-- Pika 从实例执行完 slaveof no one 与主节点解除主从关系后，config rewrite slaveof 信息到配置文件中[#2973](https://github.com/OpenAtomFoundation/pika/pull/2973)@[cheniujh](https://github.com/cheniujh)
+- Pika 从实例执行完 slaveof no one 与主节点解除主从关系后，将 slaveof 信息持久化到配置文件中[#2973](https://github.com/OpenAtomFoundation/pika/pull/2973)@[cheniujh](https://github.com/cheniujh)
 
 - Pika-Operater 主从模式支持数据备份和恢复的功能[#2968](https://github.com/OpenAtomFoundation/pika/pull/2968)@[buzhimingyonghu](https://github.com/buzhimingyonghu)
 
@@ -14,7 +14,7 @@
 
 - Pika-Operater 支持拉起主从模式，拉起方式详见 readme 文档[#2903](https://github.com/OpenAtomFoundation/pika/pull/2903)@[XiaoLiang2333](https://github.com/XiaoLiang2333）
 
-- Pika-Expoter 支持新增 keyspace_hits、keyspace_misses 指标，运维同学可以根据指标判断当前业务 key 的命中率[#2579](https://github.com/OpenAtomFoundation/pika/pull/2579)@[chenbt](https://github.com/chenbt）
+- Pika-Exporter 支持新增 keyspace_hits、keyspace_misses 指标，运维同学可以根据指标判断当前业务 key 的命中率[#2579](https://github.com/OpenAtomFoundation/pika/pull/2579)@[chenbt](https://github.com/chenbt）
 
 - RedisCache 中不存储大 key, 避免占用内存过多或者存储大 key 将业务多次访问的热 key 淘汰掉，影响性能[#2557](https://github.com/OpenAtomFoundation/pika/pull/2557)@[QlQlqiqi](https://github.com/QlQlqiqi)
 
@@ -36,7 +36,7 @@
 
 - 修复 rpoplpush 命令未更新缓存，导致数据库、缓存数据不一致的问题[#2976](https://github.com/OpenAtomFoundation/pika/pull/2976)@[cheniujh](https://github.com/cheniujh)
 
-- 修复 Pika-Expoter 上下版本不兼容，导致 Expoter 日志打印过多浪费磁盘资源的问题[#2971](https://github.com/OpenAtomFoundation/pika/pull/2971)@[buzhimingyonghu](https://github.com/buzhimingyonghu)
+- 修复 Pika-Exporter 上下版本不兼容，导致 Exporter 日志打印过多浪费磁盘资源的问题[#2971](https://github.com/OpenAtomFoundation/pika/pull/2971)@[buzhimingyonghu](https://github.com/buzhimingyonghu)
 
 - 将 slowlog 的日志级别调整成为 INFO，解决 Slowlog 同时打印三份，会导致磁盘占用过多的问题[#2948](https://github.com/OpenAtomFoundation/pika/pull/2948)@[buzhimingyonghu](https://github.com/buzhimingyonghu)
 
