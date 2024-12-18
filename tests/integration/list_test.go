@@ -1316,37 +1316,32 @@ var _ = Describe("List Commands", func() {
 		})
 
 		It("should LPUSH and LRANGE", func() {
-			// LPUSH 操作
+			
 			rPush := client.LPush(ctx, "mylist", "a", "b", "c", "d", "e")
 			Expect(rPush.Err()).NotTo(HaveOccurred())
 			Expect(rPush.Val()).To(Equal(int64(5)))
 
-			// LRANGE 验证列表内容
 			lRange := client.LRange(ctx, "mylist", 0, -1)
 			Expect(lRange.Err()).NotTo(HaveOccurred())
 			Expect(lRange.Val()).To(Equal([]string{"e", "d", "c", "b", "a"}))
 		})
 
 		It("should RPOPLPUSH and update list order", func() {
-			// 初始化列表
+
 			client.LPush(ctx, "mylist", "a", "b", "c", "d", "e")
 
-			// 第一次 RPOPLPUSH 操作
 			rPopPush := client.RPopLPush(ctx, "mylist", "mylist")
 			Expect(rPopPush.Err()).NotTo(HaveOccurred())
 			Expect(rPopPush.Val()).To(Equal("a"))
 
-			// 验证列表内容
 			lRange := client.LRange(ctx, "mylist", 0, -1)
 			Expect(lRange.Err()).NotTo(HaveOccurred())
 			Expect(lRange.Val()).To(Equal([]string{"a", "e", "d", "c", "b"}))
 
-			// 第二次 RPOPLPUSH 操作
 			rPopPush = client.RPopLPush(ctx, "mylist", "mylist")
 			Expect(rPopPush.Err()).NotTo(HaveOccurred())
 			Expect(rPopPush.Val()).To(Equal("b"))
 
-			// 验证列表内容
 			lRange = client.LRange(ctx, "mylist", 0, -1)
 			Expect(lRange.Err()).NotTo(HaveOccurred())
 			Expect(lRange.Val()).To(Equal([]string{"b", "a", "e", "d", "c"}))

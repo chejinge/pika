@@ -1,3 +1,34 @@
+# V4.0.2
+
+## New features
+
+- After executing `slaveof no one` to remove the replication relationship with the master node, Pika rewrites the `slaveof` information into the configuration file using `config rewrite`. [#2973](https://github.com/OpenAtomFoundation/pika/pull/2973) @[cheniujh](https://github.com/cheniujh)
+
+- Added support for backup and recovery in master-slave mode for Pika-Operator. [#2968](https://github.com/OpenAtomFoundation/pika/pull/2968) @[buzhimingyonghu](https://github.com/buzhimingyonghu)
+
+- Added the `log-net-activities` parameter in the configuration file to dynamically enable or disable the logging of certain connection-related activities. This can be adjusted with `config get/set`. [#2964](https://github.com/OpenAtomFoundation/pika/pull/2964) @[cheniujh](https://github.com/cheniujh)
+
+- Added the `repl_connect_status` metric to Pika info and integrated it into `pika_exporter` to facilitate monitoring of the replication status. [#2961](https://github.com/OpenAtomFoundation/pika/pull/2961) @[cheniujh](https://github.com/cheniujh)
+
+- Upgraded `kubeblocks` to version 0.9, improving and optimizing Pika-Operator to simplify code and support instance scale-down. [#2860](https://github.com/OpenAtomFoundation/pika/pull/2860) @[XiaoLiang2333](https://github.com/XiaoLiang2333)
+
+- Pika-Operator now supports starting in master-slave mode. See the README document for more details. [#2903](https://github.com/OpenAtomFoundation/pika/pull/2903) @[XiaoLiang2333](https://github.com/XiaoLiang2333)
+
+- Added `keyspace_hits` and `keyspace_misses` metrics to Pika-Exporter, enabling users to monitor key hit rates. [#2579](https://github.com/OpenAtomFoundation/pika/pull/2579) @[chenbt](https://github.com/chenbt)
+
+- RedisCache now avoids storing large keys to prevent excessive memory usage or the eviction of frequently accessed hot keys, which could impact performance. [#2557](https://github.com/OpenAtomFoundation/pika/pull/2557) @[QlQlqiqi](https://github.com/QlQlqiqi)
+
+## Improvement
+
+- Pika now supports dynamically modifying the `max-subcompactions` parameter to optimize the `compact` operation for L0 layers at runtime. [#2965](https://github.com/OpenAtomFoundation/pika/pull/2965) @[cheniujh](https://github.com/cheniujh)
+
+- Improved the `log-retention-time` parameter to dynamically adjust the number of days for log retention. [#2963](https://github.com/OpenAtomFoundation/pika/pull/2963) @[cheniujh](https://github.com/cheniujh)
+
+- Moved the `Pika-Migrate` code to the `tools` folder to simplify binary compilation in different environments for data migration. [#2941](https://github.com/OpenAtomFoundation/pika/pull/2941) @[chenbt-hz](https://github.com/chenbt-hz)
+
+- Added Go tests for Pika complex data types and management commands to ensure service stability. [#2840](https://github.com/OpenAtomFoundation
+
+
 # V4.0.1
 
 ## New Features
