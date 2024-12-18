@@ -28,6 +28,27 @@
 
 - Added Go tests for Pika complex data types and management commands to ensure service stability. [#2840](https://github.com/OpenAtomFoundation
 
+- Updated the `actions/checkout` in GitHub Actions workflow to v5 for enhanced security and performance. [#2833](https://github.com/OpenAtomFoundation/pika/pull/2833) @[baerwang](https://github.com/baerwang)
+
+- Added a new compact strategy in Pika to optimize write performance by prioritizing files unused for the longest time or files with the most deleted entries. [#2557](https://github.com/OpenAtomFoundation/pika/pull/2557) @[QlQlqiqi](https://github.com/QlQlqiqi)
+
+## Bugfix
+
+- Fixed the `rpoplpush` command cache update issue, which caused inconsistency between the database and cache. [#2976](https://github.com/OpenAtomFoundation/pika/pull/2976) @[cheniujh](https://github.com/cheniujh)
+
+- Fixed compatibility issues between different versions of Pika-Exporter, which caused excessive logging and wasted disk resources. [#2971](https://github.com/OpenAtomFoundation/pika/pull/2971) @[buzhimingyonghu](https://github.com/buzhimingyonghu)
+
+- Adjusted the log level of `slowlog` to INFO to address the issue of triple logging, which consumed excessive disk space. [#2948](https://github.com/OpenAtomFoundation/pika/pull/2948) @[buzhimingyonghu](https://github.com/buzhimingyonghu)
+
+- Improved CI stability by resolving specific failure issues. [#2937](https://github.com/OpenAtomFoundation/pika/pull/2937) @[chejinge](https://github.com/chejinge)
+
+- Fixed an issue where Pika instances could not set administrator passwords independently. [#2920](https://github.com/OpenAtomFoundation/pika/issues/2920) @[buzhimingyonghu](https://github.com/buzhimingyonghu)
+
+- Resolved a reference counter destructor issue in the epoll loop for `std::shared_ptr in_conn` objects, ensuring Pika connections are closed in a timely manner. [#2904](https://github.com/OpenAtomFoundation/pika/pull/2904) @[cheniujh](https://github.com/cheniujh)
+
+- Fixed a cache inconsistency issue caused by the `zpopmin` command during deletion operations. [#2892](https://github.com/OpenAtomFoundation/pika/issues/2892) @[chejinge](https://github.com/chejinge)
+
+
 
 # V4.0.1
 
