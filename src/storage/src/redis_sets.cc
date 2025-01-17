@@ -836,6 +836,10 @@ rocksdb::Status RedisSets::SMove(const Slice& source, const Slice& destination, 
 }
 
 rocksdb::Status RedisSets::SPop(const Slice& key, std::vector<std::string>* members, int64_t count) {
+  if (count <= 0) {
+    return Status::InvalidArgument("Count must be greater than zero");
+  }
+
   std::default_random_engine engine(std::random_device{}());
 
   // Lock granularity optimization
@@ -861,31 +865,27 @@ rocksdb::Status RedisSets::SPop(const Slice& key, std::vector<std::string>* memb
   int32_t version = parsed_sets_meta_value.version();
   SetsMemberKey sets_member_key(key, version, Slice());
 
-  // Optimize: Generate sorted random indices
-  std::unordered_set<int32_t> random_indices;
-  while (random_indices.size() < count) {
-    random_indices.insert(engine() % set_size);
-  }
-
-  std::vector<int32_t> sorted_indices(random_indices.begin(), random_indices.end());
-  std::sort(sorted_indices.begin(), sorted_indices.end());
+  // Generate sorted random indices efficiently
+  std::vector<int32_t> indices(set_size);
+  std::iota(indices.begin(), indices.end(), 0);
+  std::shuffle(indices.begin(), indices.end(), engine);
+  indices.resize(count);
+  std::sort(indices.begin(), indices.end());
 
   auto iter = db_->NewIterator(default_read_options_, handles_[1]);
   int32_t cur_index = 0;
   int64_t deleted_count = 0;
 
-  for (int32_t target_index : sorted_indices) {
-    for (iter->Seek(sets_member_key.Encode());
-         iter->Valid() && cur_index <= target_index;
-         iter->Next(), ++cur_index) {
-
-      if (cur_index == target_index) {
-        batch.Delete(handles_[1], iter->key());
-        ParsedSetsMemberKey parsed_sets_member_key(iter->key());
-        members->push_back(parsed_sets_member_key.member().ToString());
-        deleted_count++;
-        break;
-      }
+  auto target_iter = indices.begin();
+  for (iter->Seek(sets_member_key.Encode());
+       iter->Valid() && target_iter != indices.end();
+       iter->Next(), ++cur_index) {
+    if (cur_index == *target_iter) {
+      batch.Delete(handles_[1], iter->key());
+      ParsedSetsMemberKey parsed_sets_member_key(iter->key());
+      members->push_back(parsed_sets_member_key.member().ToString());
+      ++deleted_count;
+      ++target_iter;
     }
   }
   delete iter;
