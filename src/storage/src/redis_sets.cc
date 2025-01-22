@@ -90,6 +90,7 @@ rocksdb::Status Redis::SAdd(const Slice& key, const std::vector<std::string>& me
   }
   if (s.ok()) {
     ParsedSetsMetaValue parsed_sets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_sets_meta_value.Count());
     if (parsed_sets_meta_value.IsStale() || parsed_sets_meta_value.Count() == 0) {
       version = parsed_sets_meta_value.InitialMetaValue();
       if (!parsed_sets_meta_value.check_set_count(static_cast<int32_t>(filtered_members.size()))) {
@@ -169,6 +170,7 @@ rocksdb::Status Redis::SCard(const Slice& key, int32_t* ret, std::string&& meta)
 
   if (s.ok()) {
     ParsedSetsMetaValue parsed_sets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_sets_meta_value.Count());
     if (parsed_sets_meta_value.IsStale()) {
       return rocksdb::Status::NotFound("Stale");
     } else {
@@ -211,6 +213,7 @@ rocksdb::Status Redis::SDiff(const std::vector<std::string>& keys, std::vector<s
     }
     if (s.ok()) {
       ParsedSetsMetaValue parsed_sets_meta_value(&meta_value);
+
       if (!parsed_sets_meta_value.IsStale() && parsed_sets_meta_value.Count() != 0) {
         vaild_sets.push_back({keys[idx], parsed_sets_meta_value.Version()});
       }
@@ -933,6 +936,7 @@ rocksdb::Status Redis::SPop(const Slice& key, std::vector<std::string>* members,
   }
   if (s.ok()) {
     ParsedSetsMetaValue parsed_sets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_sets_meta_value.Count());
     if (parsed_sets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_sets_meta_value.Count() == 0) {
@@ -1050,6 +1054,7 @@ rocksdb::Status Redis::SRandmember(const Slice& key, int32_t count, std::vector<
   }
   if (s.ok()) {
     ParsedSetsMetaValue parsed_sets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_sets_meta_value.Count());
     if (parsed_sets_meta_value.IsStale()) {
       return rocksdb::Status::NotFound("Stale");
     } else if (parsed_sets_meta_value.Count() == 0) {
@@ -1124,6 +1129,7 @@ rocksdb::Status Redis::SRem(const Slice& key, const std::vector<std::string>& me
   }
   if (s.ok()) {
     ParsedSetsMetaValue parsed_sets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_sets_meta_value.Count());
     if (parsed_sets_meta_value.IsStale()) {
       return rocksdb::Status::NotFound("stale");
     } else if (parsed_sets_meta_value.Count() == 0) {
@@ -1353,6 +1359,7 @@ rocksdb::Status Redis::SScan(const Slice& key, int64_t cursor, const std::string
   }
   if (s.ok()) {
     ParsedSetsMetaValue parsed_sets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_sets_meta_value.Count());
     if (parsed_sets_meta_value.IsStale() || parsed_sets_meta_value.Count() == 0) {
       *next_cursor = 0;
       return rocksdb::Status::NotFound();
@@ -1503,6 +1510,7 @@ rocksdb::Status Redis::SetsExpireat(const Slice& key, int64_t timestamp_millsec,
   }
   if (s.ok()) {
     ParsedSetsMetaValue parsed_sets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_sets_meta_value.Count());
     if (parsed_sets_meta_value.IsStale()) {
       return rocksdb::Status::NotFound("Stale");
     } else if (parsed_sets_meta_value.Count() == 0) {
@@ -1542,6 +1550,7 @@ rocksdb::Status Redis::SetsPersist(const Slice& key, std::string&& prefetch_meta
   }
   if (s.ok()) {
     ParsedSetsMetaValue parsed_sets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_sets_meta_value.Count());
     if (parsed_sets_meta_value.IsStale()) {
       return rocksdb::Status::NotFound("Stale");
     } else if (parsed_sets_meta_value.Count() == 0) {
@@ -1581,6 +1590,7 @@ rocksdb::Status Redis::SetsTTL(const Slice& key, int64_t* ttl_millsec, std::stri
   }
   if (s.ok()) {
     ParsedSetsMetaValue parsed_setes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_setes_meta_value.Count());
     if (parsed_setes_meta_value.IsStale()) {
       *ttl_millsec = -2;
       return rocksdb::Status::NotFound("Stale");

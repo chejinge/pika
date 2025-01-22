@@ -1106,6 +1106,7 @@ class Storage {
   Status GetUsage(const std::string& property, uint64_t* result);
   Status GetUsage(const std::string& property, std::map<int, uint64_t>* type_result);
   uint64_t GetProperty(const std::string& property);
+  Status GetBigKeyStatistics(const std::string& property, uint64_t* out);
 
   Status GetKeyNum(std::vector<KeyInfo>* key_infos);
   Status StopScanKeyNum();

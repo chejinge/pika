@@ -359,6 +359,22 @@ class Redis {
   void ScanZsets();
   void ScanSets();
 
+  void CheckBigKeyAndLog(const std::string& key, uint64_t size) {
+    static const uint64_t kBigKeyThreshold = 10000;
+    if (size > kBigKeyThreshold) {
+      std::lock_guard<std::mutex> lock(big_key_access_mutex_);
+      big_key_access_count_[key]++;
+      std::cerr << "[BIGKEY DETECTED] Key: " << key
+                << ", Size: " << size
+                << ", Access Count: " << big_key_access_count_[key] << std::endl;
+    }
+  }
+
+  std::unordered_map<std::string, int> GetBigKeyStatistics() {
+    std::lock_guard<std::mutex> lock(big_key_access_mutex_);
+    return big_key_access_count_;
+  }
+
   TypeIterator* CreateIterator(const DataType& type, const std::string& pattern, const Slice* lower_bound, const Slice* upper_bound) {
     return CreateIterator(DataTypeTag[static_cast<int>(type)], pattern, lower_bound, upper_bound);
   }
@@ -538,6 +554,9 @@ private:
   Status UpdateSpecificKeyStatistics(const DataType& dtype, const std::string& key, uint64_t count);
   Status UpdateSpecificKeyDuration(const DataType& dtype, const std::string& key, uint64_t duration);
   Status AddCompactKeyTaskIfNeeded(const DataType& dtype, const std::string& key, uint64_t count, uint64_t duration);
+
+  std::unordered_map<std::string, int> big_key_access_count_;
+  std::mutex big_key_access_mutex_;
 };
 
 }  //  namespace storage

@@ -1879,6 +1879,22 @@ uint64_t Storage::GetProperty(const std::string& property) {
   return result;
 }
 
+
+Status Storage::GetBigKeyStatistics(const std::string& property, uint64_t* out) {
+  uint64_t result = 0;
+
+  for (const auto& inst : insts_) {
+    auto inst_result = inst->GetBigKeyStatistics();
+
+    for (const auto& entry : inst_result) {
+      result += entry.second;
+    }
+  }
+
+  *out = result;
+  return Status::OK();
+}
+
 Status Storage::GetKeyNum(std::vector<KeyInfo>* key_infos) {
   KeyInfo key_info;
   key_infos->resize(DataTypeNum);

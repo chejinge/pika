@@ -95,6 +95,7 @@ Status Redis::HDel(const Slice& key, const std::vector<std::string>& fields, int
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale() || parsed_hashes_meta_value.Count() == 0) {
       *ret = 0;
       return Status::OK();
@@ -159,6 +160,7 @@ Status Redis::HGet(const Slice& key, const Slice& field, std::string* value) {
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_hashes_meta_value.Count() == 0) {
@@ -199,6 +201,7 @@ Status Redis::HGetall(const Slice& key, std::vector<FieldValue>* fvs) {
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_hashes_meta_value.Count() == 0) {
@@ -242,6 +245,7 @@ Status Redis::HGetallWithTTL(const Slice& key, std::vector<FieldValue>* fvs, int
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.Count() == 0) {
       return Status::NotFound();
     } else if (parsed_hashes_meta_value.IsStale()) {
@@ -299,6 +303,7 @@ Status Redis::HIncrby(const Slice& key, const Slice& field, int64_t value, int64
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale() || parsed_hashes_meta_value.Count() == 0) {
       version = parsed_hashes_meta_value.UpdateVersion();
       parsed_hashes_meta_value.SetCount(1);
@@ -392,6 +397,7 @@ Status Redis::HIncrbyfloat(const Slice& key, const Slice& field, const Slice& by
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale() || parsed_hashes_meta_value.Count() == 0) {
       version = parsed_hashes_meta_value.UpdateVersion();
       parsed_hashes_meta_value.SetCount(1);
@@ -476,6 +482,7 @@ Status Redis::HKeys(const Slice& key, std::vector<std::string>* fields) {
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_hashes_meta_value.Count() == 0) {
@@ -519,6 +526,7 @@ Status Redis::HLen(const Slice& key, int32_t* ret, std::string&& prefetch_meta) 
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale()) {
       *ret = 0;
       return Status::NotFound("Stale");
@@ -558,6 +566,7 @@ Status Redis::HMGet(const Slice& key, const std::vector<std::string>& fields, st
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if ((is_stale = parsed_hashes_meta_value.IsStale()) || parsed_hashes_meta_value.Count() == 0) {
       for (size_t idx = 0; idx < fields.size(); ++idx) {
         vss->push_back({std::string(), Status::NotFound()});
@@ -622,6 +631,7 @@ Status Redis::HMSet(const Slice& key, const std::vector<FieldValue>& fvs) {
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale() || parsed_hashes_meta_value.Count() == 0) {
       version = parsed_hashes_meta_value.InitialMetaValue();
       if (!parsed_hashes_meta_value.check_set_count(static_cast<int32_t>(filtered_fvs.size()))) {
@@ -697,6 +707,7 @@ Status Redis::HSet(const Slice& key, const Slice& field, const Slice& value, int
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale() || parsed_hashes_meta_value.Count() == 0) {
       version = parsed_hashes_meta_value.InitialMetaValue();
       parsed_hashes_meta_value.SetCount(1);
@@ -772,6 +783,7 @@ Status Redis::HSetnx(const Slice& key, const Slice& field, const Slice& value, i
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale() || parsed_hashes_meta_value.Count() == 0) {
       version = parsed_hashes_meta_value.InitialMetaValue();
       parsed_hashes_meta_value.SetCount(1);
@@ -835,6 +847,7 @@ Status Redis::HVals(const Slice& key, std::vector<std::string>* values) {
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_hashes_meta_value.Count() == 0) {
@@ -898,6 +911,7 @@ Status Redis::HScan(const Slice& key, int64_t cursor, const std::string& pattern
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale() || parsed_hashes_meta_value.Count() == 0) {
       *next_cursor = 0;
       return Status::NotFound();
@@ -975,6 +989,7 @@ Status Redis::HScanx(const Slice& key, const std::string& start_field, const std
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale() || parsed_hashes_meta_value.Count() == 0) {
       *next_field = "";
       return Status::NotFound();
@@ -1045,6 +1060,7 @@ Status Redis::PKHScanRange(const Slice& key, const Slice& field_start, const std
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale() || parsed_hashes_meta_value.Count() == 0) {
       return Status::NotFound();
     } else {
@@ -1116,6 +1132,7 @@ Status Redis::PKHRScanRange(const Slice& key, const Slice& field_start, const st
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale() || parsed_hashes_meta_value.Count() == 0) {
       return Status::NotFound();
     } else {
@@ -1178,6 +1195,7 @@ Status Redis::HashesExpire(const Slice& key, int64_t ttl_millsec, std::string&& 
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_hashes_meta_value.Count() == 0) {
@@ -1218,6 +1236,7 @@ Status Redis::HashesDel(const Slice& key, std::string&& prefetch_meta) {
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_hashes_meta_value.Count() == 0) {
@@ -1255,6 +1274,7 @@ Status Redis::HashesExpireat(const Slice& key, int64_t timestamp_millsec, std::s
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_hashes_meta_value.Count() == 0) {
@@ -1294,6 +1314,7 @@ Status Redis::HashesPersist(const Slice& key, std::string&& prefetch_meta) {
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_hashes_meta_value.Count() == 0) {
@@ -1333,6 +1354,7 @@ Status Redis::HashesTTL(const Slice& key, int64_t* ttl_millsec, std::string&& pr
   }
   if (s.ok()) {
     ParsedHashesMetaValue parsed_hashes_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_hashes_meta_value.Count());
     if (parsed_hashes_meta_value.IsStale()) {
       *ttl_millsec = -2;
       return Status::NotFound("Stale");

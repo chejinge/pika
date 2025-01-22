@@ -84,6 +84,7 @@ Status Redis::ZPopMax(const Slice& key, const int64_t count, std::vector<ScoreMe
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -142,6 +143,7 @@ Status Redis::ZPopMin(const Slice& key, const int64_t count, std::vector<ScoreMe
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -212,6 +214,7 @@ Status Redis::ZAdd(const Slice& key, const std::vector<ScoreMember>& score_membe
   if (s.ok()) {
     bool vaild = true;
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale() || parsed_zsets_meta_value.Count() == 0) {
       vaild = false;
       version = parsed_zsets_meta_value.InitialMetaValue();
@@ -316,6 +319,7 @@ Status Redis::ZCard(const Slice& key, int32_t* card, std::string&& prefetch_meta
 
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       *card = 0;
       return Status::NotFound("Stale");
@@ -353,6 +357,7 @@ Status Redis::ZCount(const Slice& key, double min, double max, bool left_close, 
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -421,6 +426,7 @@ Status Redis::ZIncrby(const Slice& key, const Slice& member, double increment, d
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale() || parsed_zsets_meta_value.Count() == 0) {
       version = parsed_zsets_meta_value.InitialMetaValue();
     } else {
@@ -500,6 +506,7 @@ Status Redis::ZRange(const Slice& key, int32_t start, int32_t stop, std::vector<
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -557,6 +564,7 @@ Status Redis::ZRangeWithTTL(const Slice& key, int32_t start, int32_t stop, std::
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.Count() == 0) {
       return Status::NotFound();
     } else if (parsed_zsets_meta_value.IsStale()) {
@@ -628,6 +636,7 @@ Status Redis::ZRangebyscore(const Slice& key, double min, double max, bool left_
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -705,6 +714,7 @@ Status Redis::ZRank(const Slice& key, const Slice& member, int32_t* rank) {
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -767,6 +777,7 @@ Status Redis::ZRem(const Slice& key, const std::vector<std::string>& members, in
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -830,6 +841,7 @@ Status Redis::ZRemrangebyrank(const Slice& key, int32_t start, int32_t stop, int
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -898,6 +910,7 @@ Status Redis::ZRemrangebyscore(const Slice& key, double min, double max, bool le
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -980,6 +993,7 @@ Status Redis::ZRevrange(const Slice& key, int32_t start, int32_t stop, std::vect
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -1038,6 +1052,7 @@ Status Redis::ZRevrangebyscore(const Slice& key, double min, double max, bool le
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -1115,6 +1130,7 @@ Status Redis::ZRevrank(const Slice& key, const Slice& member, int32_t* rank) {
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -1169,6 +1185,7 @@ Status Redis::ZScore(const Slice& key, const Slice& member, double* score) {
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     uint64_t version = parsed_zsets_meta_value.Version();
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
@@ -1218,6 +1235,7 @@ Status Redis::ZGetAll(const Slice& key, double weight, std::map<std::string, dou
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (!parsed_zsets_meta_value.IsStale() && parsed_zsets_meta_value.Count() != 0) {
       int32_t cur_index = 0;
       int32_t stop_index = parsed_zsets_meta_value.Count() - 1;
@@ -1542,6 +1560,7 @@ Status Redis::ZRangebylex(const Slice& key, const Slice& min, const Slice& max, 
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale() || parsed_zsets_meta_value.Count() == 0) {
       return Status::NotFound();
     } else {
@@ -1615,6 +1634,7 @@ Status Redis::ZRemrangebylex(const Slice& key, const Slice& min, const Slice& ma
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+
     if (parsed_zsets_meta_value.IsStale() || parsed_zsets_meta_value.Count() == 0) {
       return Status::NotFound();
     } else {
@@ -1731,6 +1751,7 @@ Status Redis::ZsetsDel(const Slice& key, std::string&& prefetch_meta) {
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -1768,6 +1789,7 @@ Status Redis::ZsetsExpireat(const Slice& key, int64_t timestamp_millsec, std::st
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -1816,6 +1838,7 @@ Status Redis::ZScan(const Slice& key, int64_t cursor, const std::string& pattern
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale() || parsed_zsets_meta_value.Count() == 0) {
       *next_cursor = 0;
       return Status::NotFound();
@@ -1893,6 +1916,7 @@ Status Redis::ZsetsPersist(const Slice& key, std::string&& prefetch_meta) {
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_zsets_meta_value.Count() == 0) {
@@ -1932,6 +1956,7 @@ Status Redis::ZsetsTTL(const Slice& key, int64_t* ttl_millsec, std::string&& pre
   }
   if (s.ok()) {
     ParsedZSetsMetaValue parsed_zsets_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_zsets_meta_value.Count());
     if (parsed_zsets_meta_value.IsStale()) {
       *ttl_millsec = -2;
       return Status::NotFound("Stale");

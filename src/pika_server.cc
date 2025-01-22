@@ -803,7 +803,6 @@ void PikaServer::PurgeDir(const std::string& path) {
   PurgeDirTaskSchedule(&DoPurgeDir, static_cast<void*>(dir_path));
 }
 
-
 void PikaServer::PurgeDirTaskSchedule(void (*function)(void*), void* arg) {
   purge_thread_.StartThread();
   purge_thread_.Schedule(function, arg);

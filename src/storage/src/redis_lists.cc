@@ -79,6 +79,7 @@ Status Redis::LIndex(const Slice& key, int64_t index, std::string* element) {
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     uint64_t version = parsed_lists_meta_value.Version();
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
@@ -123,6 +124,7 @@ Status Redis::LInsert(const Slice& key, const BeforeOrAfter& before_or_after, co
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -239,6 +241,7 @@ Status Redis::LLen(const Slice& key, uint64_t* len, std::string&& prefetch_meta)
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -274,6 +277,7 @@ Status Redis::LPop(const Slice& key, int64_t count, std::vector<std::string>* el
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -332,6 +336,7 @@ Status Redis::LPush(const Slice& key, const std::vector<std::string>& values, ui
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale() || parsed_lists_meta_value.Count() == 0) {
       version = parsed_lists_meta_value.InitialMetaValue();
     } else {
@@ -388,6 +393,7 @@ Status Redis::LPushx(const Slice& key, const std::vector<std::string>& values, u
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -432,6 +438,7 @@ Status Redis::LRange(const Slice& key, int64_t start, int64_t stop, std::vector<
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -492,6 +499,7 @@ Status Redis::LRangeWithTTL(const Slice& key, int64_t start, int64_t stop, std::
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.Count() == 0) {
       return Status::NotFound();
     } else if (parsed_lists_meta_value.IsStale()) {
@@ -561,6 +569,7 @@ Status Redis::LRem(const Slice& key, int64_t count, const Slice& value, uint64_t
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -693,6 +702,7 @@ Status Redis::LSet(const Slice& key, int64_t index, const Slice& value) {
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -737,6 +747,7 @@ Status Redis::LTrim(const Slice& key, int64_t start, int64_t stop) {
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     uint64_t version = parsed_lists_meta_value.Version();
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
@@ -810,6 +821,7 @@ Status Redis::RPop(const Slice& key, int64_t count, std::vector<std::string>* el
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -1118,6 +1130,7 @@ Status Redis::ListsExpire(const Slice& key, int64_t ttl_millsec, std::string&& p
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -1158,6 +1171,7 @@ Status Redis::ListsDel(const Slice& key, std::string&& prefetch_meta) {
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -1195,6 +1209,7 @@ Status Redis::ListsExpireat(const Slice& key, int64_t timestamp_millsec, std::st
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -1234,6 +1249,7 @@ Status Redis::ListsPersist(const Slice& key, std::string&& prefetch_meta) {
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       return Status::NotFound("Stale");
     } else if (parsed_lists_meta_value.Count() == 0) {
@@ -1273,6 +1289,7 @@ Status Redis::ListsTTL(const Slice& key, int64_t* ttl_millsec, std::string&& pre
   }
   if (s.ok()) {
     ParsedListsMetaValue parsed_lists_meta_value(&meta_value);
+    CheckBigKeyAndLog(key.ToString(), parsed_lists_meta_value.Count());
     if (parsed_lists_meta_value.IsStale()) {
       *ttl_millsec = -2;
       return Status::NotFound("Stale");

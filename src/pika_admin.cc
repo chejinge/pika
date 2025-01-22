@@ -1091,6 +1091,7 @@ void InfoCmd::InfoStats(std::string& info) {
   tmp_stream << "is_compact:" << (g_pika_server->IsCompacting() ? "Yes" : "No") << "\r\n";
   tmp_stream << "compact_cron:" << g_pika_conf->compact_cron() << "\r\n";
   tmp_stream << "compact_interval:" << g_pika_conf->compact_interval() << "\r\n";
+  tmp_stream << "# Big Key Statistics\r\n";
   time_t current_time_s = time(nullptr);
   PikaServer::BGSlotsReload bgslotsreload_info = g_pika_server->bgslots_reload();
   bool is_reloading = g_pika_server->GetSlotsreloading();
@@ -1372,6 +1373,7 @@ void InfoCmd::InfoData(std::string& info) {
   uint64_t memtable_usage = 0;
   uint64_t table_reader_usage = 0;
   std::shared_lock db_rwl(g_pika_server->dbs_rw_);
+  uint64_t total_big_key_count = 0;
   for (const auto& db_item : g_pika_server->dbs_) {
     if (!db_item.second) {
       continue;
@@ -1382,6 +1384,11 @@ void InfoCmd::InfoData(std::string& info) {
     db_item.second->storage()->GetUsage(storage::PROPERTY_TYPE_ROCKSDB_CUR_SIZE_ALL_MEM_TABLES, &memtable_usage);
     db_item.second->storage()->GetUsage(storage::PROPERTY_TYPE_ROCKSDB_ESTIMATE_TABLE_READER_MEM, &table_reader_usage);
     db_item.second->storage()->GetUsage(storage::PROPERTY_TYPE_ROCKSDB_BACKGROUND_ERRORS, &background_errors);
+
+    uint64_t big_key_count = 0;
+    db_item.second->storage()->GetBigKeyStatistics("bigkey_property", &big_key_count);
+    total_big_key_count += big_key_count;
+
     db_item.second->DBUnlockShared();
     total_memtable_usage += memtable_usage;
     total_table_reader_usage += table_reader_usage;
@@ -1401,6 +1408,7 @@ void InfoCmd::InfoData(std::string& info) {
   tmp_stream << "db_tablereader_usage:" << total_table_reader_usage << "\r\n";
   tmp_stream << "db_fatal:" << (total_background_errors != 0 ? "1" : "0") << "\r\n";
   tmp_stream << "db_fatal_msg:" << (total_background_errors != 0 ? db_fatal_msg_stream.str() : "nullptr") << "\r\n";
+  tmp_stream << "big_key_count:" << total_big_key_count << "\r\n";
 
   info.append(tmp_stream.str());
 }
