@@ -48,78 +48,160 @@ void HDelCmd::DoUpdateCache() {
 }
 
 void HSetCmd::DoInitial() {
-  if (!CheckArg(argv_.size())) {
+  if (argv_.size() < 4) {
     res_.SetRes(CmdRes::kWrongNum, kCmdNameHSet);
     return;
   }
-  key_ = argv_[1];
-  field_ = argv_[2];
-  value_ = argv_[3];
-}
 
-void HSetCmd::Do() {
-  int32_t ret = 0;
-  s_ = db_->storage()->HSet(key_, field_, value_, &ret);
-  if (s_.ok()) {
-    res_.AppendContent(":" + std::to_string(ret));
-    AddSlotKey("h", key_, db_);
-  } else if (s_.IsInvalidArgument()) {
-    res_.SetRes(CmdRes::kMultiKey);
+  key_ = argv_[1];
+  if (argv_.size() == 4) {
+    field_ = argv_[2];
+    value_ = argv_[3];
+  }
+
+  else if (argv_.size() > 4 && argv_.size() % 2 == 0) {
+    for (size_t i = 2; i < argv_.size(); i += 2) {
+      fields_values_.emplace_back(argv_[i], argv_[i + 1]);
+    }
   } else {
-    res_.SetRes(CmdRes::kErrOther, s_.ToString());
+    res_.SetRes(CmdRes::kWrongNum, kCmdNameHSet);
   }
 }
+
+
+
+void HSetCmd::Do() {
+  if (argv_.size() == 4) {
+    // 处理传统 HSET，设置单个字段-值对
+    int32_t count = 0;
+    s_ = db_->storage()->HSet(key_, field_, value_, &count);
+    if (s_.ok()) {
+      res_.AppendContent(":" + std::to_string(count));
+      AddSlotKey("h", key_, db_);
+    } else {
+      res_.SetRes(CmdRes::kErrOther, s_.ToString());
+    }
+  } else if (argv_.size() > 4 && argv_.size() % 2 == 0) {
+    s_ = db_->storage()->HMSet(key_, fields_values_);
+    if (s_.ok()) {
+      res_.AppendContent(":" + std::to_string(fields_values_.size()));
+      AddSlotKey("h", key_, db_);
+    } else {
+      res_.SetRes(CmdRes::kErrOther, s_.ToString());
+    }
+  }
+}
+
+
 
 void HSetCmd::DoThroughDB() {
   Do();
 }
 
 void HSetCmd::DoUpdateCache() {
-  // HSetIfKeyExist() can void storing large key, but IsTooLargeKey() can speed up it
   if (IsTooLargeKey(g_pika_conf->max_key_size_in_cache())) {
     return;
   }
+
   if (s_.ok()) {
-    db_->cache()->HSetIfKeyExist(key_, field_, value_);
+    if (argv_.size() == 4) {
+      db_->cache()->HSetIfKeyExist(key_, field_, value_);
+    }
+    else if (argv_.size() > 4 && argv_.size() % 2 == 0) {
+      db_->cache()->HMSet(key_, fields_values_);
+    }
   }
 }
 
+
 void HGetCmd::DoInitial() {
-  if (!CheckArg(argv_.size())) {
+  if (argv_.size() < 3) {
     res_.SetRes(CmdRes::kWrongNum, kCmdNameHGet);
     return;
   }
+
   key_ = argv_[1];
-  field_ = argv_[2];
+  if (argv_.size() == 3) {
+    field_ = argv_[2];
+  }
+
+  else if (argv_.size() > 3) {
+    for (size_t i = 2; i < argv_.size(); ++i) {
+      fields_.push_back(argv_[i]);
+    }
+  }
 }
+
 
 void HGetCmd::Do() {
-  std::string value;
-  s_ = db_->storage()->HGet(key_, field_, &value);
-  if (s_.ok()) {
-    res_.AppendStringLenUint64(value.size());
-    res_.AppendContent(value);
-  } else if (s_.IsInvalidArgument()) {
-    res_.SetRes(CmdRes::kMultiKey);
-  } else if (s_.IsNotFound()) {
-    res_.AppendContent("$-1");
-  } else {
-    res_.SetRes(CmdRes::kErrOther, s_.ToString());
+  if (argv_.size() == 3) {
+    std::string value;
+    s_ = db_->storage()->HGet(key_, field_, &value);
+
+    if (s_.ok()) {
+      res_.AppendStringLenUint64(value.size());
+      res_.AppendContent(value);
+    } else if (s_.IsNotFound()) {
+      res_.AppendContent("$-1");
+    } else {
+      res_.SetRes(CmdRes::kErrOther, s_.ToString());
+    }
+  }
+  else if (argv_.size() > 3) {
+    std::vector<storage::ValueStatus> values;
+    s_ = db_->storage()->HMGet(key_, fields_, &values);
+
+    if (s_.ok()) {
+      res_.AppendArrayLen(values.size());
+      for (const auto& vs : values) {
+        if (vs.status.ok()) {
+          res_.AppendStringLenUint64(vs.value.size());
+          res_.AppendContent(vs.value);
+        } else {
+          res_.AppendContent("$-1");
+        }
+      }
+    } else {
+      res_.SetRes(CmdRes::kErrOther, s_.ToString());
+    }
   }
 }
 
+
 void HGetCmd::ReadCache() {
-  std::string value;
-  auto s = db_->cache()->HGet(key_, field_, &value);
-  if (s.ok()) {
-    res_.AppendStringLen(value.size());
-    res_.AppendContent(value);
-  } else if (s.IsNotFound()) {
-    res_.SetRes(CmdRes::kCacheMiss);
-  } else {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
+  if (argv_.size() == 3) {
+    std::string value;
+    auto s = db_->cache()->HGet(key_, field_, &value);
+    if (s.ok()) {
+      res_.AppendStringLen(value.size());
+      res_.AppendContent(value);
+    } else if (s.IsNotFound()) {
+      res_.SetRes(CmdRes::kCacheMiss);
+    } else {
+      res_.SetRes(CmdRes::kErrOther, s.ToString());
+    }
+  }
+  else if (argv_.size() > 3) {
+    std::vector<storage::ValueStatus> values;
+    auto s = db_->cache()->HMGet(key_, fields_, &values);
+    if (s.ok()) {
+      res_.AppendArrayLen(values.size());
+      for (const auto& vs : values) {
+        if (vs.status.ok()) {
+          res_.AppendStringLen(vs.value.size());
+          res_.AppendContent(vs.value);
+        } else {
+          res_.AppendContent("$-1");
+        }
+      }
+    } else if (s.IsNotFound()) {
+      res_.SetRes(CmdRes::kCacheMiss);
+    } else {
+      res_.SetRes(CmdRes::kErrOther, s.ToString());
+    }
   }
 }
+
 
 void HGetCmd::DoThroughDB() {
   res_.clear();
