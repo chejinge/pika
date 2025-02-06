@@ -87,50 +87,54 @@ void HGetCmd::DoInitial() {
     res_.SetRes(CmdRes::kWrongNum, kCmdNameHGet);
     return;
   }
-  key_ = argv_[1];
-  for (size_t i = 2; i < argv_.size(); ++i) {
-    fields_.emplace_back(argv_[i]);
+  if (!CheckArg(argv_.size())) {
+    res_.SetRes(CmdRes::kWrongNum, kCmdNameHMget);
+    return;
   }
+  key_ = argv_[1];
+  auto iter = argv_.begin();
+  iter++;
+  iter++;
+  fields_.assign(iter, argv_.end());
 }
 
 void HGetCmd::Do() {
-  std::vector<std::string> values;
-  s_ = db_->storage()->HMGet(key_, fields_, vss);
-
-  if (!s_.ok()) {
-    res_.SetRes(CmdRes::kErrOther, s_.ToString());
-    return;
-  }
-
-  res_.AppendArrayLen(fields_.size());
-  for (const auto& value : values) {
-    if (!value.empty()) {
-      res_.AppendStringLenUint64(value.size());
-      res_.AppendContent(value);
-    } else {
-      res_.AppendContent("$-1");
+  std::vector<storage::ValueStatus> vss;
+  s_ = db_->storage()->HMGet(key_, fields_, &vss);
+  if (s_.ok() || s_.IsNotFound()) {
+    res_.AppendArrayLenUint64(vss.size());
+    for (const auto& vs : vss) {
+      if (vs.status.ok()) {
+        res_.AppendStringLenUint64(vs.value.size());
+        res_.AppendContent(vs.value);
+      } else {
+        res_.AppendContent("$-1");
+      }
     }
+  } else {
+    res_.SetRes(CmdRes::kErrOther, s_.ToString());
   }
 }
 
+
 void HGetCmd::ReadCache() {
-  std::vector<std::string> values;
+  std::vector<storage::ValueStatus> vss;
   std::string CachePrefixKeyH = PCacheKeyPrefixH + key_;
-
-  auto s = db_->cache()->HMGet(CachePrefixKeyH, fields_, vss);
-  if (!s.ok()) {
-    res_.SetRes(CmdRes::kErrOther, s.ToString());
-    return;
-  }
-
-  res_.AppendArrayLen(fields_.size());
-  for (const auto& value : values) {
-    if (!value.empty()) {
-      res_.AppendStringLen(value.size());
-      res_.AppendContent(value);
-    } else {
-      res_.AppendContent("$-1");
+  auto s = db_->cache()->HMGet(CachePrefixKeyH, fields_, &vss);
+  if (s.ok()) {
+    res_.AppendArrayLen(vss.size());
+    for (const auto& vs : vss) {
+      if (vs.status.ok()) {
+        res_.AppendStringLen(vs.value.size());
+        res_.AppendContent(vs.value);
+      } else {
+        res_.AppendContent("$-1");
+      }
     }
+  } else if (s.IsNotFound()) {
+    res_.SetRes(CmdRes::kCacheMiss);
+  } else {
+    res_.SetRes(CmdRes::kErrOther, s.ToString());
   }
 }
 
@@ -140,13 +144,16 @@ void HGetCmd::DoThroughDB() {
 }
 
 void HGetCmd::DoUpdateCache() {
+
   if (IsTooLargeKey(g_pika_conf->max_key_size_in_cache())) {
     return;
   }
+
   if (s_.ok()) {
     db_->cache()->PushKeyToAsyncLoadQueue(PIKA_KEY_TYPE_HASH, key_, db_);
   }
 }
+
 
 void HGetallCmd::DoInitial() {
   if (!CheckArg(argv_.size())) {
