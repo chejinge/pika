@@ -61,13 +61,13 @@ void HSetCmd::DoInitial() {
 }
 
 void HSetCmd::Do() {
-  int32_t added = 0;
+  int32_t ret = 0;
 
   s_ = db_->storage()->HMSet(key_, vss_);
 
   if (s_.ok()) {
-    added = vss_.size() / 2;
-    res_.AppendContent(":" + std::to_string(added));
+    ret = vss_.size() / 2;
+    res_.AppendContent(":" + std::to_string(ret));
     AddSlotKey("h", key_, db_);
   } else {
     res_.SetRes(CmdRes::kErrOther, s_.ToString());
