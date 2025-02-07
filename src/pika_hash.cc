@@ -91,31 +91,39 @@ void HGetCmd::DoInitial() {
     res_.SetRes(CmdRes::kWrongNum, kCmdNameHGet);
     return;
   }
-  if (!CheckArg(argv_.size())) {
-    res_.SetRes(CmdRes::kWrongNum, kCmdNameHMget);
-    return;
+  key_ = argv_[1];
+  if (argv_.size() == 3) {
+    field_ = argv_[2];
+  }
+
+  else if (argv_.size() > 3) {
+    for (size_t i = 2; i < argv_.size(); ++i) {
+      fields_.push_back(argv_[i]);
+    }
   }
 }
 
 void HGetCmd::Do() {
-  std::vector<storage::ValueStatus> vss;
-  std::string value;
-  if (fields_.size() == 1) {
-    s_ = db_->storage()->HGet(key_, fields_[0], &value);
-    if (s_.ok() || s_.IsNotFound()) {
-      res_.AppendArrayLenUint64(1);
-      if (!vss.empty() && vss[0].status.ok()) {
-        res_.AppendStringLenUint64(vss[0].value.size());
-        res_.AppendContent(vss[0].value);
-      } else {
-        res_.AppendContent("$-1");
-      }
+  if (argv_.size() == 3) {
+    std::string value;
+    s_ = db_->storage()->HGet(key_, field_, &value);
+
+    if (s_.ok()) {
+      res_.AppendStringLenUint64(value.size());
+      res_.AppendContent(value);
+    } else if (s_.IsNotFound()) {
+      res_.AppendContent("$-1");
+    } else {
+      res_.SetRes(CmdRes::kErrOther, s_.ToString());
     }
-  } else {
-    s_ = db_->storage()->HMGet(key_, fields_, &vss);
-    if (s_.ok() || s_.IsNotFound()) {
-      res_.AppendArrayLenUint64(vss.size());
-      for (const auto& vs : vss) {
+  }
+  else if (argv_.size() > 3) {
+    std::vector<storage::ValueStatus> values;
+    s_ = db_->storage()->HMGet(key_, fields_, &values);
+
+    if (s_.ok()) {
+      res_.AppendArrayLen(values.size());
+      for (const auto& vs : values) {
         if (vs.status.ok()) {
           res_.AppendStringLenUint64(vs.value.size());
           res_.AppendContent(vs.value);
@@ -132,27 +140,24 @@ void HGetCmd::Do() {
 void HGetCmd::ReadCache() {
   std::vector<storage::ValueStatus> vss;
   std::string CachePrefixKeyH = PCacheKeyPrefixH + key_;
-  std::string value;
-  if (fields_.size() == 1) {
-    auto s = db_->cache()->HGet(CachePrefixKeyH, fields_[0], &value);
+  if (argv_.size() == 3) {
+    std::string value;
+    auto s = db_->cache()->HGet(CachePrefixKeyH, field_, &value);
     if (s.ok()) {
-      res_.AppendArrayLen(1);
-      if (!vss.empty() && vss[0].status.ok()) {
-        res_.AppendStringLen(vss[0].value.size());
-        res_.AppendContent(vss[0].value);
-      } else {
-        res_.AppendContent("$-1");
-      }
+      res_.AppendStringLen(value.size());
+      res_.AppendContent(value);
     } else if (s.IsNotFound()) {
       res_.SetRes(CmdRes::kCacheMiss);
     } else {
       res_.SetRes(CmdRes::kErrOther, s.ToString());
     }
-  } else {
-    auto s = db_->cache()->HMGet(CachePrefixKeyH, fields_, &vss);
+  }
+  else if (argv_.size() > 3) {
+    std::vector<storage::ValueStatus> values;
+    auto s = db_->cache()->HMGet(CachePrefixKeyH, fields_, &values);
     if (s.ok()) {
-      res_.AppendArrayLen(vss.size());
-      for (const auto& vs : vss) {
+      res_.AppendArrayLen(values.size());
+      for (const auto& vs : values) {
         if (vs.status.ok()) {
           res_.AppendStringLen(vs.value.size());
           res_.AppendContent(vs.value);
