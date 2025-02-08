@@ -46,31 +46,48 @@ void HDelCmd::DoUpdateCache() {
 }
 
 void HSetCmd::DoInitial() {
-  if (argv_.size() < 4 || (argv_.size() % 2) == 1) {
-    res_.SetRes(CmdRes::kWrongNum, kCmdNameHSet);
-    return;
-  }
   key_ = argv_[1];
 
   size_t argc = argv_.size();
   size_t index = 2;
-  vss_.clear();
-  for (; index < argc; index += 2) {
-    vss_.push_back({argv_[index], argv_[index + 1]});
+  if (argv_.size() < 4) {
+    res_.SetRes(CmdRes::kWrongNum, kCmdNameHSet);
+    return;
+  }
+
+  key_ = argv_[1];
+  if (argv_.size() == 4) {
+    field_ = argv_[2];
+    value_ = argv_[3];
+  }
+
+  else if (argv_.size() > 4 && argv_.size() % 2 == 0) {
+    for (; index < argc; index += 2) {
+      vss_.push_back({argv_[index], argv_[index + 1]});
+    }
+  } else {
+    res_.SetRes(CmdRes::kWrongNum, kCmdNameHSet);
   }
 }
 
 void HSetCmd::Do() {
-  int32_t ret = 0;
-
-  s_ = db_->storage()->HMSet(key_, vss_);
-
-  if (s_.ok()) {
-    ret = vss_.size() / 2;
-    res_.AppendContent(":" + std::to_string(ret));
-    AddSlotKey("h", key_, db_);
-  } else {
-    res_.SetRes(CmdRes::kErrOther, s_.ToString());
+  if (argv_.size() == 4) {
+    int32_t count = 0;
+    s_ = db_->storage()->HSet(key_, field_, value_, &count);
+    if (s_.ok()) {
+      res_.AppendContent(":" + std::to_string(count));
+      AddSlotKey("h", key_, db_);
+    } else {
+      res_.SetRes(CmdRes::kErrOther, s_.ToString());
+    }
+  } else if (argv_.size() > 4 && argv_.size() % 2 == 0) {
+    s_ = db_->storage()->HMSet(key_, vss_);
+    if (s_.ok()) {
+      res_.AppendContent(":" + std::to_string(vss_.size()));
+      AddSlotKey("h", key_, db_);
+    } else {
+      res_.SetRes(CmdRes::kErrOther, s_.ToString());
+    }
   }
 }
 
@@ -80,9 +97,11 @@ void HSetCmd::DoThroughDB() {
 }
 
 void HSetCmd::DoUpdateCache() {
-  if (s_.ok()) {
-    std::string CachePrefixKeyH = PCacheKeyPrefixH + key_;
-    db_->cache()->HMSetxx(CachePrefixKeyH, vss_);
+  if (argv_.size() == 4) {
+    db_->cache()->HSetIfKeyExist(key_, field_, value_);
+  }
+  else if (argv_.size() > 4 && argv_.size() % 2 == 0) {
+    db_->cache()->HMSet(key_, vss_);
   }
 }
 
