@@ -173,11 +173,10 @@ void HGetCmd::ReadCache() {
     }
   }
   else if (argv_.size() > 3) {
-    std::vector<storage::ValueStatus> values;
-    auto s = db_->cache()->HMGet(CachePrefixKeyH, fields_, &values);
+    auto s = db_->cache()->HMGet(CachePrefixKeyH, fields_, &vss);
     if (s.ok()) {
-      res_.AppendArrayLen(values.size());
-      for (const auto& vs : values) {
+      res_.AppendArrayLen(vss.size());
+      for (const auto& vs : vss) {
         if (vs.status.ok()) {
           res_.AppendStringLen(vs.value.size());
           res_.AppendContent(vs.value);
