@@ -157,8 +157,6 @@ void HGetCmd::Do() {
 }
 
 void HGetCmd::ReadCache() {
-  std::vector<storage::ValueStatus> vss;
-  vss.clear();
   std::string CachePrefixKeyH = PCacheKeyPrefixH + key_;
   if (argv_.size() == 3) {
     std::string value;
@@ -173,6 +171,8 @@ void HGetCmd::ReadCache() {
     }
   }
   else if (argv_.size() > 3) {
+    std::vector<storage::ValueStatus> vss;
+    vss.clear();
     auto s = db_->cache()->HMGet(CachePrefixKeyH, fields_, &vss);
     if (s.ok()) {
       res_.AppendArrayLen(vss.size());
