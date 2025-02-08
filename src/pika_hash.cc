@@ -63,7 +63,7 @@ void HSetCmd::DoInitial() {
 
   else if (argv_.size() > 4 && argv_.size() % 2 == 0) {
     for (; index < argc; index += 2) {
-      vss_.push_back({argv_[index], argv_[index + 1]});
+      fields_values_.push_back({argv_[index], argv_[index + 1]});
     }
   } else {
     res_.SetRes(CmdRes::kWrongNum, kCmdNameHSet);
@@ -81,9 +81,9 @@ void HSetCmd::Do() {
       res_.SetRes(CmdRes::kErrOther, s_.ToString());
     }
   } else if (argv_.size() > 4 && argv_.size() % 2 == 0) {
-    s_ = db_->storage()->HMSet(key_, vss_);
+    s_ = db_->storage()->HMSet(key_, fields_values_);
     if (s_.ok()) {
-      res_.AppendContent(":" + std::to_string(vss_.size()));
+      res_.AppendContent(":" + std::to_string(fields_values_.size()));
       AddSlotKey("h", key_, db_);
     } else {
       res_.SetRes(CmdRes::kErrOther, s_.ToString());
@@ -97,11 +97,12 @@ void HSetCmd::DoThroughDB() {
 }
 
 void HSetCmd::DoUpdateCache() {
+  std::string CachePrefixKeyH = PCacheKeyPrefixH + key_;
   if (argv_.size() == 4) {
-    db_->cache()->HSetIfKeyExist(key_, field_, value_);
+    db_->cache()->HSetIfKeyExist(CachePrefixKeyH, field_, value_);
   }
   else if (argv_.size() > 4 && argv_.size() % 2 == 0) {
-    db_->cache()->HMSet(key_, vss_);
+    db_->cache()->HMSet(CachePrefixKeyH, fields_values_);
   }
 }
 
