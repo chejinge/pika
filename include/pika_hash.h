@@ -60,7 +60,6 @@ class HGetCmd : public Cmd {
  private:
   std::string key_, field_;
   std::vector<std::string> fields_;
-  std::vector<storage::ValueStatus>* vss_;
   void DoInitial() override;
   rocksdb::Status s_;
 };

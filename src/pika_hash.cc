@@ -83,7 +83,7 @@ void HSetCmd::Do() {
   } else if (argv_.size() > 4 && argv_.size() % 2 == 0) {
     s_ = db_->storage()->HMSet(key_, vss_);
     if (s_.ok()) {
-      res_.AppendContent(":" + std::to_string(vss_.size()));
+      res_.AppendContent(":" + std::to_string(argv_.size()));
       AddSlotKey("h", key_, db_);
     } else {
       res_.SetRes(CmdRes::kErrOther, s_.ToString());
@@ -158,6 +158,7 @@ void HGetCmd::Do() {
 
 void HGetCmd::ReadCache() {
   std::vector<storage::ValueStatus> vss;
+  vss.clear();
   std::string CachePrefixKeyH = PCacheKeyPrefixH + key_;
   if (argv_.size() == 3) {
     std::string value;
