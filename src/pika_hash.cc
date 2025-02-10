@@ -68,11 +68,8 @@ void HSetCmd::DoInitial() {
   }
 }
 
-
-
 void HSetCmd::Do() {
   if (argv_.size() == 4) {
-    // 处理传统 HSET，设置单个字段-值对
     int32_t count = 0;
     s_ = db_->storage()->HSet(key_, field_, value_, &count);
     if (s_.ok()) {
